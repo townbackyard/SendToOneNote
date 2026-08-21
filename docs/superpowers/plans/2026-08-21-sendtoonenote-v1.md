@@ -28,7 +28,7 @@
 ### Task 1: Solution scaffold, CI, license
 
 **Files:**
-- Create: `SendToOneNote.sln`, `src/SendToOneNote.Core/SendToOneNote.Core.csproj`, `src/SendToOneNote/SendToOneNote.csproj`, `src/SendToOneNote/App.xaml`, `src/SendToOneNote/App.xaml.cs`, `tests/SendToOneNote.Tests/SendToOneNote.Tests.csproj`, `tests/SendToOneNote.Tests/SmokeTests.cs`, `.github/workflows/build.yml`, `LICENSE`, `Directory.Build.props`
+- Create: `SendToOneNote.slnx`, `src/SendToOneNote.Core/SendToOneNote.Core.csproj`, `src/SendToOneNote/SendToOneNote.csproj`, `src/SendToOneNote/App.xaml`, `src/SendToOneNote/App.xaml.cs`, `tests/SendToOneNote.Tests/SendToOneNote.Tests.csproj`, `tests/SendToOneNote.Tests/SmokeTests.cs`, `.github/workflows/build.yml`, `LICENSE`, `Directory.Build.props`
 
 **Interfaces:**
 - Consumes: nothing.
@@ -37,14 +37,16 @@
 - [ ] **Step 1: Create solution and projects**
 
 ```powershell
-dotnet new sln -n SendToOneNote
+dotnet new sln -n SendToOneNote --format slnx
 dotnet new classlib -o src/SendToOneNote.Core -n SendToOneNote.Core
 dotnet new wpf -o src/SendToOneNote -n SendToOneNote
 dotnet new xunit -o tests/SendToOneNote.Tests -n SendToOneNote.Tests
-dotnet sln add src/SendToOneNote.Core src/SendToOneNote tests/SendToOneNote.Tests
+dotnet sln SendToOneNote.slnx add src/SendToOneNote.Core src/SendToOneNote tests/SendToOneNote.Tests
 dotnet add tests/SendToOneNote.Tests reference src/SendToOneNote.Core
 dotnet add src/SendToOneNote reference src/SendToOneNote.Core
 ```
+
+If the installed SDK's sln template doesn't accept `--format slnx`, create the classic `.sln`, run `dotnet sln SendToOneNote.sln migrate`, and delete the `.sln` — the repo keeps only `SendToOneNote.slnx`.
 
 - [ ] **Step 2: Pin TFMs and shared properties**
 

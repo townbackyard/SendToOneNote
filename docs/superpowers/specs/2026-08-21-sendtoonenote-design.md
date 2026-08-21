@@ -38,7 +38,7 @@ Deliberately deferred; captured here so v1 design doesn't preclude them:
 
 ## Architecture
 
-Single .NET 10 C# WPF application, tray-resident. Projects:
+Single .NET 10 C# WPF application, tray-resident. Solution file uses the XML solution format (`SendToOneNote.slnx`). Image shrinking uses System.Drawing.Common — Windows-only desktop apps are its supported scenario since .NET 6; it is isolated behind `ImageShrinker` so it could be swapped (SkiaSharp, WIC) without touching callers. Projects:
 
 - `SendToOneNote` — WPF app: tray icon, picker window, settings window, toast notifications.
 - `SendToOneNote.Core` — class library, no UI dependencies: watcher, parser, page builder, Graph client, auth. All logic that unit tests target.

@@ -1,0 +1,23 @@
+<Window x:Class="SendToOneNote.FirstRunWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="SendToOneNote setup" Width="460" Height="300"
+        WindowStartupLocation="CenterScreen">
+    <StackPanel Margin="16">
+        <TextBlock TextWrapping="Wrap" Margin="0,0,0,12"
+                   Text="Sign in with the Microsoft account whose OneDrive holds your OneNote notebooks, then choose the folder you'll drag emails into."/>
+        <Button x:Name="SignInBtn" Content="Sign in to Microsoft" Click="SignIn_Click"
+                Width="200" HorizontalAlignment="Left"/>
+        <TextBlock x:Name="SignedInAs" Margin="0,6,0,12" Foreground="Gray"/>
+        <DockPanel Margin="0,0,0,12">
+            <Button DockPanel.Dock="Right" Content="Browse…" Click="Browse_Click" Width="80"/>
+            <TextBox x:Name="FolderBox" Margin="0,0,8,0"/>
+        </DockPanel>
+        <CheckBox x:Name="StartupBox" Content="Start SendToOneNote when Windows starts"
+                  IsChecked="True"/>
+        <TextBlock TextWrapping="Wrap" Margin="0,10,0,0" Foreground="Gray"
+                   Text="Tip: drag the drop folder into Explorer's Quick Access so it's always one drag away."/>
+        <Button Content="Finish" Width="100" HorizontalAlignment="Right" Margin="0,14,0,0"
+                Click="Finish_Click"/>
+    </StackPanel>
+</Window>

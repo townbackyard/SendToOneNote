@@ -106,19 +106,17 @@ public sealed class TrayContext : IDisposable
         _tokens = null;
     }
 
+    private static readonly Lazy<FileLog> StaticLog = new(() => new FileLog(Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "SendToOneNote", "logs")));
+
     /// <summary>
     /// Best-effort logging for global exception handlers that run outside any
     /// TrayContext instance (or before one exists). Never throws.
     /// </summary>
     public static void TryLogStatic(string msg, Exception? ex)
     {
-        try
-        {
-            var dir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "SendToOneNote", "logs");
-            new FileLog(dir).Error(msg, ex);
-        }
+        try { StaticLog.Value.Error(msg, ex); }
         catch { /* never throw from a global exception handler */ }
     }
 }

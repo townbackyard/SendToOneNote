@@ -7,12 +7,14 @@ public partial class App : Application
 {
     private TrayContext? _tray;
     private Mutex? _mutex;
+    private bool _ownsMutex;
 
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
         _mutex = new Mutex(initiallyOwned: true, @"Local\SendToOneNote.SingleInstance", out var createdNew);
+        _ownsMutex = createdNew;
         if (!createdNew)
         {
             MessageBox.Show("SendToOneNote is already running — check the system tray.", "SendToOneNote");
@@ -46,7 +48,7 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         _tray?.Dispose();
-        _mutex?.ReleaseMutex();
+        if (_ownsMutex) _mutex?.ReleaseMutex();
         _mutex?.Dispose();
         base.OnExit(e);
     }

@@ -1,0 +1,8 @@
+# Build output
+bin/
+obj/
+.vs/
+*.user
+
+# Real emails used for local testing — contain personal data, never commit
+fixtures/local/

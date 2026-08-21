@@ -1,4 +1,5 @@
 using System.IO;
+using System.Net.Http;
 using System.Windows;
 using SendToOneNote.Core.Auth;
 using SendToOneNote.Core.Email;
@@ -17,6 +18,10 @@ public sealed class SavePipeline(
     // HttpClient-per-call anti-pattern of constructing a new ImageResolver per email.
     private readonly ImageResolver _images = new();
 
+    // Serializes the whole pipeline so concurrent multi-drops queue in arrival order
+    // instead of racing on the picker dialog and settings.json read-modify-write.
+    private readonly SemaphoreSlim _gate = new(1, 1);
+
     public event Action<string, string?>? Saved;   // (message, onenoteClientUrl)
     public event Action<string>? Failed;           // message
 
@@ -26,17 +31,28 @@ public sealed class SavePipeline(
         // must be a silent no-op, not an error toast.
         if (!File.Exists(path)) return;
 
+        await _gate.WaitAsync();
         try
         {
+            // The file may have been processed while this call was queued behind the gate.
+            if (!File.Exists(path)) return;
+
             ParsedEmail email;
             await using (var s = File.OpenRead(path))
                 email = EmlParser.Parse(s);
 
-            var tree = store.LoadTreeCache() ?? await RefreshTreeAsync();
-            // Background refresh for next time — logged instead of silently swallowed.
-            _ = RefreshTreeAsync().ContinueWith(t =>
-                log.Error("Background notebook refresh failed", t.Exception),
-                TaskContinuationOptions.OnlyOnFaulted);
+            var tree = store.LoadTreeCache();
+            if (tree is null)
+            {
+                tree = await RefreshTreeAsync();
+            }
+            else
+            {
+                // Background refresh for next time — logged instead of silently swallowed.
+                _ = RefreshTreeAsync().ContinueWith(t =>
+                    log.Error("Background notebook refresh failed", t.Exception),
+                    TaskContinuationOptions.OnlyOnFaulted);
+            }
 
             var settings = store.LoadSettings();
             var vm = new SectionPickerViewModel(tree, settings.RecentSectionIds);
@@ -71,8 +87,13 @@ public sealed class SavePipeline(
                 EmlParseException => "That file isn't a readable email.",
                 AuthRequiredException => "Sign-in required — open SendToOneNote from the tray.",
                 OneNoteApiException o => $"OneNote API error {o.StatusCode}.",
+                HttpRequestException => "You appear to be offline. The email was moved to the Failed folder — drag it back into the drop folder to retry.",
                 _ => "Unexpected error — see log."
             });
+        }
+        finally
+        {
+            _gate.Release();
         }
     }
 

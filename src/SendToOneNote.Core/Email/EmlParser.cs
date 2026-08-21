@@ -28,7 +28,8 @@ public static class EmlParser
             var inline = new List<InlineImage>();
             foreach (var part in (msg.BodyParts ?? []).OfType<MimePart>())
             {
-                if (part.ContentType.MediaType != "image" || part.ContentId is null || part.Content is null)
+                if (!string.Equals(part.ContentType.MediaType, "image", StringComparison.OrdinalIgnoreCase) ||
+                    part.ContentId is null || part.Content is null)
                     continue;
                 using var ms = new MemoryStream();
                 part.Content.DecodeTo(ms);

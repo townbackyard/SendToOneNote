@@ -66,6 +66,29 @@ public class DropFolderWatcherTests : IDisposable
     }
 
     [Fact]
+    public async Task RaisesWatchErrorOnReadinessTimeout()
+    {
+        // A 1s readiness timeout keeps this test fast instead of waiting on the 30s default.
+        using var w = new DropFolderWatcher(_dir, TimeSpan.FromSeconds(1));
+        string? error = null;
+        var emlReadyFired = false;
+        var signal = new TaskCompletionSource();
+        w.WatchError += msg => { error = msg; signal.TrySetResult(); };
+        w.EmlReady += _ => emlReadyFired = true;
+        w.Start();
+
+        var path = Path.Combine(_dir, "stuck.eml");
+        using (File.Open(path, FileMode.Create, FileAccess.Write, FileShare.None))
+        {
+            await Task.WhenAny(signal.Task, Task.Delay(10_000));
+        }
+
+        Assert.NotNull(error);
+        Assert.Contains("stuck.eml", error);
+        Assert.False(emlReadyFired);
+    }
+
+    [Fact]
     public async Task ThrowingSubscriberRaisesWatchErrorAndDoesNotCrash()
     {
         using var w = new DropFolderWatcher(_dir);

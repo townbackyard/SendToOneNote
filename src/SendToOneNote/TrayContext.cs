@@ -45,7 +45,7 @@ public sealed class TrayContext : IDisposable
         _watcher = new DropFolderWatcher(settings.DropFolder!);
         _watcher.EmlReady += p => _ = _pipeline.HandleEmlAsync(p);
         _watcher.NonEmlIgnored += p => _log.Info($"Ignored non-eml: {p}");
-        _watcher.WatchError += msg => _log.Error(msg);
+        _watcher.WatchError += msg => { _log.Error(msg); Notify("SendToOneNote — problem", msg, null); };
         _watcher.Start();
 
         _icon = new TaskbarIcon
@@ -72,7 +72,11 @@ public sealed class TrayContext : IDisposable
         AddItem(menu, "Sign in again", async () =>
         {
             try { await _tokens.GetAccessTokenAsync(interactiveAllowed: true); }
-            catch (Exception ex) { _log.Error("Interactive sign-in failed", ex); }
+            catch (Exception ex)
+            {
+                _log.Error("Interactive sign-in failed", ex);
+                Notify("SendToOneNote — sign-in failed", ex.Message, null);
+            }
         });
         AddItem(menu, "Exit", () => Application.Current.Shutdown());
         _icon.ContextMenu = menu;
@@ -86,7 +90,7 @@ public sealed class TrayContext : IDisposable
         menu.Items.Add(mi);
     }
 
-    private void Notify(string title, string message, string? url, NotificationIcon icon)
+    private void Notify(string title, string message, string? url, NotificationIcon icon = NotificationIcon.Warning)
     {
         Application.Current.Dispatcher.Invoke(() =>
         {
@@ -100,5 +104,21 @@ public sealed class TrayContext : IDisposable
         _icon?.Dispose();
         _watcher?.Dispose();
         _tokens = null;
+    }
+
+    /// <summary>
+    /// Best-effort logging for global exception handlers that run outside any
+    /// TrayContext instance (or before one exists). Never throws.
+    /// </summary>
+    public static void TryLogStatic(string msg, Exception? ex)
+    {
+        try
+        {
+            var dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "SendToOneNote", "logs");
+            new FileLog(dir).Error(msg, ex);
+        }
+        catch { /* never throw from a global exception handler */ }
     }
 }

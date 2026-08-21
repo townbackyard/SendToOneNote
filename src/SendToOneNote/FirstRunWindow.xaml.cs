@@ -57,7 +57,16 @@ public partial class FirstRunWindow : Window
         }
         _settings.DropFolder = FolderBox.Text;
         Directory.CreateDirectory(_settings.DropFolder);
-        if (StartupBox.IsChecked == true) CreateStartupShortcut();
+        if (StartupBox.IsChecked == true)
+        {
+            try { CreateStartupShortcut(); }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this,
+                    $"Couldn't create the Startup shortcut: {ex.Message}\nYou can add one manually later.",
+                    "SendToOneNote");
+            }
+        }
         Completed = true;
         Close();
     }

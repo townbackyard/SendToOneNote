@@ -44,6 +44,37 @@ public class OneNoteClientTests
     }
 
     [Fact]
+    public async Task FollowsNextLinkAcrossPages()
+    {
+        const string Page1Json = """
+        {"value":[{"id":"n1","displayName":"NotebookOne","sections":[]}],
+         "@odata.nextLink":"https://graph.microsoft.com/v1.0/me/onenote/notebooks?page2"}
+        """;
+        const string Page2Json = """
+        {"value":[{"id":"n2","displayName":"NotebookTwo","sections":[]}]}
+        """;
+        var stub = new StubHttpHandler(req =>
+        {
+            // Check AbsolutePath (not the full URL) for "sectionGroups": the notebooks
+            // request's own $expand query string contains that substring too.
+            var json = req.RequestUri!.AbsolutePath.Contains("sectionGroups") ? EmptyGroupsJson
+                : req.RequestUri!.ToString().Contains("page2") ? Page2Json
+                : Page1Json;
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            { Content = new StringContent(json, Encoding.UTF8, "application/json") };
+        });
+
+        var tree = await new OneNoteClient(new FakeTokens(), stub).GetNotebookTreeAsync();
+
+        Assert.Equal(2, tree.Notebooks.Count);
+        var names = tree.Notebooks.Select(n => n.Name).ToList();
+        Assert.Equal(2, names.Distinct().Count());
+        Assert.Contains("NotebookOne", names);
+        Assert.Contains("NotebookTwo", names);
+        Assert.Contains(stub.Requests, r => r.RequestUri!.ToString().Contains("page2"));
+    }
+
+    [Fact]
     public async Task CreatePagePostsMultipartWithPresentationAndParts()
     {
         var stub = new StubHttpHandler(_ => new HttpResponseMessage(HttpStatusCode.Created)

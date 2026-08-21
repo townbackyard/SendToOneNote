@@ -71,7 +71,7 @@ public sealed class OneNoteClient
         string? next = url;
         while (next is not null)
         {
-            var doc = JsonDocument.Parse(await SendAsync(
+            using var doc = JsonDocument.Parse(await SendAsync(
                 () => new HttpRequestMessage(HttpMethod.Get, next), ct));
             all.AddRange(doc.RootElement.GetProperty("value").EnumerateArray()
                 .Select(e => e.Clone()));
@@ -95,10 +95,16 @@ public sealed class OneNoteClient
                 $"{Base}/me/onenote/sections/{sectionId}/pages") { Content = content };
         }, ct);
 
-        var doc = JsonDocument.Parse(body).RootElement;
-        var page = new CreatedPage(
-            doc.GetProperty("id").GetString()!,
-            Href(doc, "oneNoteClientUrl"), Href(doc, "oneNoteWebUrl"));
+        string id;
+        string? clientUrl, webUrl;
+        using (var doc = JsonDocument.Parse(body))
+        {
+            var root = doc.RootElement;
+            id = root.GetProperty("id").GetString()!;
+            clientUrl = Href(root, "oneNoteClientUrl");
+            webUrl = Href(root, "oneNoteWebUrl");
+        }
+        var page = new CreatedPage(id, clientUrl, webUrl);
 
         foreach (var append in plan.Appends)
         {

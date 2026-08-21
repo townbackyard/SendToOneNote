@@ -43,9 +43,16 @@ public sealed class MsalTokenProvider : ITokenProvider
         {
             if (!interactiveAllowed)
                 throw new AuthRequiredException("Sign-in required. Open SendToOneNote and sign in.");
-            var result = await _pca.AcquireTokenInteractive(Scopes).ExecuteAsync(ct);
-            SignedInUser = result.Account.Username;
-            return result.AccessToken;
+            try
+            {
+                var result = await _pca.AcquireTokenInteractive(Scopes).ExecuteAsync(ct);
+                SignedInUser = result.Account.Username;
+                return result.AccessToken;
+            }
+            catch (MsalException ex)
+            {
+                throw new AuthRequiredException($"Sign-in was cancelled or failed: {ex.Message}");
+            }
         }
     }
 

@@ -33,7 +33,10 @@ public sealed class SavePipeline(
                 email = EmlParser.Parse(s);
 
             var tree = store.LoadTreeCache() ?? await RefreshTreeAsync();
-            _ = RefreshTreeAsync(); // background refresh for next time
+            // Background refresh for next time — logged instead of silently swallowed.
+            _ = RefreshTreeAsync().ContinueWith(t =>
+                log.Error("Background notebook refresh failed", t.Exception),
+                TaskContinuationOptions.OnlyOnFaulted);
 
             var settings = store.LoadSettings();
             var vm = new SectionPickerViewModel(tree, settings.RecentSectionIds);
@@ -88,6 +91,6 @@ public sealed class SavePipeline(
             Directory.CreateDirectory(failed);
             File.Move(path, Path.Combine(failed, Path.GetFileName(path)), overwrite: true);
         }
-        catch (IOException) { /* leave in place */ }
+        catch (Exception moveEx) { log.Error($"Could not move {path} to Failed", moveEx); }
     }
 }

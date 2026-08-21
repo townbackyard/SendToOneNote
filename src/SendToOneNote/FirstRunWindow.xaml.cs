@@ -50,6 +50,11 @@ public partial class FirstRunWindow : Window
             MessageBox.Show(this, "Please sign in first.", "SendToOneNote");
             return;
         }
+        if (string.IsNullOrWhiteSpace(FolderBox.Text))
+        {
+            MessageBox.Show(this, "Please choose a drop folder.", "SendToOneNote");
+            return;
+        }
         _settings.DropFolder = FolderBox.Text;
         Directory.CreateDirectory(_settings.DropFolder);
         if (StartupBox.IsChecked == true) CreateStartupShortcut();
@@ -62,11 +67,20 @@ public partial class FirstRunWindow : Window
         var startup = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
         var lnk = Path.Combine(startup, "SendToOneNote.lnk");
         var exe = Environment.ProcessPath!;
-        dynamic shell = Activator.CreateInstance(
-            Type.GetTypeFromProgID("WScript.Shell")!)!;
-        var sc = shell.CreateShortcut(lnk);
-        sc.TargetPath = exe;
-        sc.WorkingDirectory = Path.GetDirectoryName(exe);
-        sc.Save();
+        dynamic? shell = null;
+        dynamic? sc = null;
+        try
+        {
+            shell = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell")!)!;
+            sc = shell.CreateShortcut(lnk);
+            sc.TargetPath = exe;
+            sc.WorkingDirectory = Path.GetDirectoryName(exe);
+            sc.Save();
+        }
+        finally
+        {
+            if (sc is not null) System.Runtime.InteropServices.Marshal.ReleaseComObject(sc);
+            if (shell is not null) System.Runtime.InteropServices.Marshal.ReleaseComObject(shell);
+        }
     }
 }

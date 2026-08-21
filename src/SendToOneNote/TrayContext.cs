@@ -68,7 +68,7 @@ public sealed class TrayContext : IDisposable
 
         var menu = new System.Windows.Controls.ContextMenu();
         AddItem(menu, "Open drop folder", () =>
-            Process.Start("explorer.exe", settings.DropFolder!));
+            Process.Start(new ProcessStartInfo("explorer.exe", $"\"{settings.DropFolder}\"") { UseShellExecute = true }));
         AddItem(menu, "Sign in again", async () =>
         {
             try { await _tokens.GetAccessTokenAsync(interactiveAllowed: true); }

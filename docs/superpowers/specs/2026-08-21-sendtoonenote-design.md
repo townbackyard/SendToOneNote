@@ -95,7 +95,7 @@ JSON at `%APPDATA%\SendToOneNote\settings.json`: drop folder path, client ID ove
 
 ## Open source & distribution
 
-- MIT license. Public GitHub repo under the owner's account (creation and every push explicitly confirmed by the owner; nothing published before that).
+- MIT license. Public GitHub repo at `https://github.com/townbackyard/SendToOneNote` (creation and every push explicitly confirmed by the owner; nothing published before that).
 - Fixtures: synthetic `.eml` files modeled on real-world structure (multipart HTML with remote images, plain-text-only receipt, HTML with inline CID images) committed for tests. Real personal `.eml` files live in `fixtures/local/`, which is gitignored.
 - README: what it is (with screenshot), download/install, first-run sign-in, corporate-consent guidance, BYO-registration walkthrough, SmartScreen unblock note, privacy statement, fidelity caveat, troubleshooting (drag-out regression workaround: click the message before dragging; "… → Save as" fallback).
 - CI: GitHub Actions — build + tests on PR/push; release workflow publishes a self-contained single-file exe (win-x64) as a zip on tagged releases.

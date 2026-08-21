@@ -64,4 +64,19 @@ public class DropFolderWatcherTests : IDisposable
         using var _ = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.None);
         Assert.False(await FileReadiness.WaitUntilUnlockedAsync(path, TimeSpan.FromSeconds(1)));
     }
+
+    [Fact]
+    public async Task ThrowingSubscriberRaisesWatchErrorAndDoesNotCrash()
+    {
+        using var w = new DropFolderWatcher(_dir);
+        string? error = null;
+        var signal = new TaskCompletionSource();
+        w.EmlReady += _ => throw new InvalidOperationException("subscriber boom");
+        w.WatchError += msg => { error = msg; signal.TrySetResult(); };
+        w.Start();
+
+        await File.WriteAllTextAsync(Path.Combine(_dir, "boom.eml"), "From: a@b.c\r\n\r\nhi");
+        await Task.WhenAny(signal.Task, Task.Delay(5000));
+        Assert.Contains("subscriber boom", error);
+    }
 }

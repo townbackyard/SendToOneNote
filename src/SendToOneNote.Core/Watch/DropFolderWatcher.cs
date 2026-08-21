@@ -10,13 +10,15 @@ public sealed class DropFolderWatcher : IDisposable
 
     public event Action<string>? EmlReady;
     public event Action<string>? NonEmlIgnored;
+    public event Action<string>? WatchError;
 
     public DropFolderWatcher(string folder)
     {
         Directory.CreateDirectory(folder);
-        _fsw = new FileSystemWatcher(folder) { IncludeSubdirectories = false };
+        _fsw = new FileSystemWatcher(folder) { IncludeSubdirectories = false, InternalBufferSize = 65536 };
         _fsw.Created += (_, e) => Handle(e.FullPath);
         _fsw.Renamed += (_, e) => Handle(e.FullPath);
+        _fsw.Error += (_, e) => WatchError?.Invoke($"File watcher error: {e.GetException()?.Message}");
     }
 
     public void Start() => _fsw.EnableRaisingEvents = true;
@@ -26,6 +28,7 @@ public sealed class DropFolderWatcher : IDisposable
         if (Directory.Exists(path)) return;
         if (!path.EndsWith(".eml", StringComparison.OrdinalIgnoreCase))
         {
+            if (_ignoredOnce.Count > 256) _ignoredOnce.Clear();
             if (_ignoredOnce.TryAdd(path, 0)) NonEmlIgnored?.Invoke(path);
             return;
         }
@@ -37,6 +40,7 @@ public sealed class DropFolderWatcher : IDisposable
                 if (await FileReadiness.WaitUntilUnlockedAsync(path, TimeSpan.FromSeconds(30)))
                     EmlReady?.Invoke(path);
             }
+            catch (Exception ex) { WatchError?.Invoke($"{path}: {ex.Message}"); }
             finally { _inFlight.TryRemove(path, out _); }
         });
     }

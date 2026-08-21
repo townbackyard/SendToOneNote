@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SendToOneNote.Core/SendToOneNote.Core.csproj" />
+    <Project Path="src/SendToOneNote/SendToOneNote.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SendToOneNote.Tests/SendToOneNote.Tests.csproj" />
+  </Folder>
+</Solution>

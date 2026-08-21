@@ -52,7 +52,7 @@ public sealed class ImageResolver
                         contentType = resp.Content.Headers.ContentType?.MediaType ?? "image/png";
                     }
                 }
-                catch (Exception e) when (e is HttpRequestException or TaskCanceledException or UriFormatException)
+                catch (Exception) when (!ct.IsCancellationRequested)
                 {
                     // leave original src
                 }

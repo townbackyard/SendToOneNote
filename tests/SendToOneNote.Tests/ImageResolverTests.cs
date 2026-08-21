@@ -46,6 +46,17 @@ public class ImageResolverTests
     }
 
     [Fact]
+    public async Task ThrowingDownloadKeepsOriginalUrl()
+    {
+        var stub = new StubHttpHandler(_ => throw new IOException("connection reset"));
+        var r = new ImageResolver(stub);
+        var (xhtml, images) = await r.ResolveAsync(
+            "<html><head><title>t</title></head><body><img src=\"https://x.example/broken.png\"></body></html>", []);
+        Assert.Empty(images);
+        Assert.Contains("https://x.example/broken.png", xhtml);
+    }
+
+    [Fact]
     public async Task OutputIsWellFormedXhtml()
     {
         var stub = new StubHttpHandler(_ => StubHttpHandler.Png(PngBytes));

@@ -67,8 +67,8 @@ Components in `Core`:
 Modeled on the classic dialog (see problem statement):
 
 - Search box with type-to-filter across all sections, matching section, section group, and notebook names; results shown as `Section (Notebook » Group)`.
-- Recent sections (most recently used first, persisted, ~10 entries) listed above the tree.
-- Expandable tree: notebooks → section groups (nested) → sections.
+- Recent sections (most recently used first, persisted, ~10 entries) listed above the list.
+- Flat filtered list of all sections shown as `Section (Notebook » Group)` — the expandable tree view is deferred to the backlog (issue #20).
 - Keyboard-first: opens focused on the search box; arrow keys navigate; Enter confirms; Esc cancels (leaves the `.eml` in the folder untouched).
 - Data comes from `SectionCache`; a subtle indicator shows when a background refresh is running. Graph call: `GET /me/onenote/notebooks?$expand=sections,sectionGroups($expand=sections)` with `$select` trimming, following `@odata.nextLink` paging.
 
@@ -100,7 +100,7 @@ JSON at `%APPDATA%\SendToOneNote\settings.json`: drop folder path, client ID ove
 
 - File locked/still syncing: retry with backoff before parse; give up after ~30 s with a toast.
 - Parse or Graph failure: move `.eml` to `Failed\`, toast with a one-line reason; details to a rolling log file at `%APPDATA%\SendToOneNote\logs\`.
-- Offline / auth expired: picker still opens from cache; save fails with a clear toast (file stays in the drop folder for retry after reconnect/re-sign-in).
+- Offline / auth expired: picker still opens from cache; the save itself fails, and — like every other failure mode — the `.eml` moves to `Failed\` with a reason toast ("You appear to be offline…" / "Sign-in required…"). Dragging the file back into the drop folder retries once reconnected/re-signed-in.
 - Non-`.eml` files dropped into the folder: ignored, logged once (v1; see v2 candidates for `.txt`/image support).
 
 ## Open source & distribution

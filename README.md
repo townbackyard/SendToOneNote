@@ -47,6 +47,9 @@ Remote images are downloaded and embedded so pages outlive expiring links.
   (known Outlook regression); "… → Save as" always works.
 - Failed saves land in the drop folder's Failed subfolder; logs in
   %APPDATA%\SendToOneNote\logs.
+- Emails dropped into the folder while SendToOneNote is not running are not
+  picked up automatically — start the app and drag the file out and back in
+  (or re-save it).
 
 ## Building from source
 

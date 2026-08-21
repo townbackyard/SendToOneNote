@@ -55,4 +55,12 @@ public class PageXhtmlBuilderTests
         Assert.Contains("&lt;angle&gt; &amp; ampersand", x);
         Assert.DoesNotContain("<pre", x);
     }
+
+    [Fact]
+    public void HtmlBodyPassesThroughUnescaped()
+    {
+        var x = PageXhtmlBuilder.Build(Email(html: "<p>hi <b>there</b> &amp; friends<br></p>"));
+        Assert.Contains("<p>hi <b>there</b> &amp; friends<br></p>", x);
+        Assert.DoesNotContain("&lt;p&gt;", x);
+    }
 }

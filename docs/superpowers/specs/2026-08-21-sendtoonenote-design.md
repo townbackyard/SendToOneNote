@@ -21,14 +21,24 @@ Email content flows entirely from the local `.eml` file, so the *source* account
 
 ### Non-goals (v1)
 
-- Embedding file attachments (attachment names are listed in the header block; files are not embedded).
-- Right-click "Send to OneNote" shell handler for `.eml` files (fast-follow candidate).
+- Embedding file attachments (attachment names are listed in the header block; files are not embedded). — v2 candidate.
+- Right-click "Send to OneNote" shell handler for `.eml` files. — v2 candidate.
+- Non-`.eml` file types in the drop folder (ignored in v1). — v2 candidate.
 - Code signing (ships unsigned; README documents the SmartScreen unblock).
 - Non-Windows platforms; localization.
 
+### v2 candidates
+
+Deliberately deferred; captured here so v1 design doesn't preclude them:
+
+- **Include-attachments option**: a yes/no setting (and/or per-save checkbox in the picker) that embeds file attachments on the page instead of only listing their names.
+- **Auto-send to the same section**: an "always send to the selected location" mode mirroring the classic dialog's checkbox — skips the picker and files straight to the remembered section, with an obvious way to turn it back off (tray menu + settings).
+- **Other drop-folder file types**: `.txt` creates a page with the file's text content; `.png`/`.jpg` create a page with the image embedded in the body (not as an attachment). Filename becomes the page title; the picker flow is identical.
+- **Right-click "Send to OneNote"** shell handler for `.eml` files.
+
 ## Architecture
 
-Single .NET 8+ C# WPF application, tray-resident. Projects:
+Single .NET 10 C# WPF application, tray-resident. Projects:
 
 - `SendToOneNote` — WPF app: tray icon, picker window, settings window, toast notifications.
 - `SendToOneNote.Core` — class library, no UI dependencies: watcher, parser, page builder, Graph client, auth. All logic that unit tests target.
@@ -91,7 +101,7 @@ JSON at `%APPDATA%\SendToOneNote\settings.json`: drop folder path, client ID ove
 - File locked/still syncing: retry with backoff before parse; give up after ~30 s with a toast.
 - Parse or Graph failure: move `.eml` to `Failed\`, toast with a one-line reason; details to a rolling log file at `%APPDATA%\SendToOneNote\logs\`.
 - Offline / auth expired: picker still opens from cache; save fails with a clear toast (file stays in the drop folder for retry after reconnect/re-sign-in).
-- Non-`.eml` files dropped into the folder: ignored, logged once.
+- Non-`.eml` files dropped into the folder: ignored, logged once (v1; see v2 candidates for `.txt`/image support).
 
 ## Open source & distribution
 

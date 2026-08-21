@@ -1,0 +1,142 @@
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
+using SendToOneNote.Core.Auth;
+using SendToOneNote.Core.Pages;
+
+namespace SendToOneNote.Core.OneNote;
+
+public sealed record CreatedPage(string Id, string? ClientUrl, string? WebUrl);
+
+public sealed class OneNoteApiException(int statusCode, string message) : Exception(message)
+{
+    public int StatusCode { get; } = statusCode;
+}
+
+public sealed class OneNoteClient
+{
+    private const string Base = "https://graph.microsoft.com/v1.0";
+    private readonly ITokenProvider _tokens;
+    private readonly HttpClient _http;
+
+    public OneNoteClient(ITokenProvider tokens, HttpMessageHandler? handler = null)
+    {
+        _tokens = tokens;
+        _http = handler is null ? new HttpClient() : new HttpClient(handler);
+        _http.Timeout = TimeSpan.FromSeconds(100);
+    }
+
+    public async Task<NotebookTree> GetNotebookTreeAsync(CancellationToken ct = default)
+    {
+        var url = $"{Base}/me/onenote/notebooks?$expand=sections($select=id,displayName)," +
+                  "sectionGroups($expand=sections($select=id,displayName))&$select=id,displayName";
+        var notebooks = new List<NotebookNode>();
+        foreach (var el in await GetPagedValuesAsync(url, ct))
+        {
+            var groups = new List<GroupNode>();
+            if (el.TryGetProperty("sectionGroups", out var sgs))
+                foreach (var sg in sgs.EnumerateArray())
+                    groups.Add(await BuildGroupAsync(sg, ct));
+            notebooks.Add(new NotebookNode(
+                el.GetProperty("id").GetString()!,
+                el.GetProperty("displayName").GetString() ?? "(unnamed)",
+                ReadSections(el), groups));
+        }
+        return new NotebookTree(notebooks, DateTimeOffset.UtcNow);
+    }
+
+    private async Task<GroupNode> BuildGroupAsync(JsonElement sg, CancellationToken ct)
+    {
+        var id = sg.GetProperty("id").GetString()!;
+        var nested = new List<GroupNode>();
+        var nestedUrl = $"{Base}/me/onenote/sectionGroups/{id}/sectionGroups" +
+                        "?$expand=sections($select=id,displayName)&$select=id,displayName";
+        foreach (var child in await GetPagedValuesAsync(nestedUrl, ct))
+            nested.Add(await BuildGroupAsync(child, ct));
+        return new GroupNode(id, sg.GetProperty("displayName").GetString() ?? "(unnamed)",
+            ReadSections(sg), nested);
+    }
+
+    private static IReadOnlyList<SectionNode> ReadSections(JsonElement el)
+    {
+        if (!el.TryGetProperty("sections", out var secs)) return [];
+        return secs.EnumerateArray().Select(s => new SectionNode(
+            s.GetProperty("id").GetString()!,
+            s.GetProperty("displayName").GetString() ?? "(unnamed)")).ToList();
+    }
+
+    private async Task<List<JsonElement>> GetPagedValuesAsync(string url, CancellationToken ct)
+    {
+        var all = new List<JsonElement>();
+        string? next = url;
+        while (next is not null)
+        {
+            var doc = JsonDocument.Parse(await SendAsync(
+                () => new HttpRequestMessage(HttpMethod.Get, next), ct));
+            all.AddRange(doc.RootElement.GetProperty("value").EnumerateArray()
+                .Select(e => e.Clone()));
+            next = doc.RootElement.TryGetProperty("@odata.nextLink", out var link)
+                ? link.GetString() : null;
+        }
+        return all;
+    }
+
+    public async Task<CreatedPage> CreatePageAsync(string sectionId, PagePlan plan,
+        CancellationToken ct = default)
+    {
+        var body = await SendAsync(() =>
+        {
+            var content = new MultipartFormDataContent();
+            var pres = new StringContent(plan.PresentationXhtml, Encoding.UTF8, "application/xhtml+xml");
+            content.Add(pres, "Presentation");
+            foreach (var p in plan.Parts)
+                content.Add(MakeBinary(p), p.Name);
+            return new HttpRequestMessage(HttpMethod.Post,
+                $"{Base}/me/onenote/sections/{sectionId}/pages") { Content = content };
+        }, ct);
+
+        var doc = JsonDocument.Parse(body).RootElement;
+        var page = new CreatedPage(
+            doc.GetProperty("id").GetString()!,
+            Href(doc, "oneNoteClientUrl"), Href(doc, "oneNoteWebUrl"));
+
+        foreach (var append in plan.Appends)
+        {
+            await SendAsync(() =>
+            {
+                var content = new MultipartFormDataContent();
+                content.Add(new StringContent(append.CommandsJson, Encoding.UTF8, "application/json"),
+                    "Commands");
+                foreach (var p in append.Parts)
+                    content.Add(MakeBinary(p), p.Name);
+                return new HttpRequestMessage(HttpMethod.Patch,
+                    $"{Base}/me/onenote/pages/{page.Id}/content") { Content = content };
+            }, ct);
+        }
+        return page;
+
+        static string? Href(JsonElement doc, string name) =>
+            doc.TryGetProperty("links", out var links) &&
+            links.TryGetProperty(name, out var l) &&
+            l.TryGetProperty("href", out var h) ? h.GetString() : null;
+
+        static ByteArrayContent MakeBinary(OneNoteRequestPart p)
+        {
+            var c = new ByteArrayContent(p.Data);
+            c.Headers.ContentType = new MediaTypeHeaderValue(p.ContentType);
+            return c;
+        }
+    }
+
+    private async Task<string> SendAsync(Func<HttpRequestMessage> makeRequest, CancellationToken ct)
+    {
+        var req = makeRequest();
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer",
+            await _tokens.GetAccessTokenAsync(interactiveAllowed: false, ct));
+        var resp = await _http.SendAsync(req, ct);
+        var body = await resp.Content.ReadAsStringAsync(ct);
+        if (!resp.IsSuccessStatusCode)
+            throw new OneNoteApiException((int)resp.StatusCode, body);
+        return body;
+    }
+}

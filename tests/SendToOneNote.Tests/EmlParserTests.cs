@@ -56,4 +56,40 @@ public class EmlParserTests
         // Contract chosen: throw when there is no HTML body, no text body, and no From header.
         Assert.IsType<EmlParseException>(e);
     }
+
+    [Fact]
+    public void ExtractsAttachmentNames()
+    {
+        var raw = """
+            From: sender@example.com
+            To: recipient@example.com
+            Subject: Test with attachment
+            MIME-Version: 1.0
+            Content-Type: multipart/mixed; boundary="boundary123"
+
+            --boundary123
+            Content-Type: text/plain
+
+            This is the body of the email.
+            --boundary123
+            Content-Type: application/pdf
+            Content-Disposition: attachment; filename="report.pdf"
+            Content-Transfer-Encoding: base64
+
+            JVBERi0xLjQKJeLjz9MNCiAxIDAgb2JqCjw8L1R5cGUvQ2F0YWxvZy9QYWdlcyAyIDAgUj4+CmVu
+            ZG9iCjIgMCBvYmoKPDwvVHlwZS9QYWdlcwovS2lkc1szIDAgUl0vQ291bnQgMT4+CmVuZG9iCjMgMCBv
+            YmoKPDwvVHlwZS9QYWdlL1BhcmVudCAyIDAgUi9SZXNvdXJjZXM8PC9Gb250PDwvRjE8PC9UeXBlL0Zv
+            bnQvU3VidHlwZS9UeXBlMS9CYXNlRm9udC9IZWx2ZXRpY2E+Pj4+Pj4vUHJvY1NldFsvUERGL1RleHRd
+            Pj4vTWVkaWFCb3hbMCAwIDYxMiA3OTJdL0NvbnRlbnRzIDQgMCBSPj4KZW5kb2IKNCAwIG9iago8PC9M
+            ZW5ndGggNDQvRmlsdGVyL0ZsYXRlRGVjb2RlPj4Kc3RyZWFtCnicLcktEMAgEEDRM0N1TEJqEqxYAAAs
+            P+ADQhiQfvyBVF2UWjuYaKOxJJSEUIqFBTnVCwmSVAEKZW5kc3RyZWFtCmVuZG9iCnhyZWYKMCAxMDAwMDAwMDAw
+            IDAwMDAwIG4gCjAwMDAwMDAwMDkgMDAwMDAgbiAKMDAwMDAwMDA3NCAwMDAwMCBuIAowMDAwMDAwMTcwIDAwMDAwIG4g
+            CjAwMDAwMDAyOTkgMDAwMDAgbiAKdHJhaWxlcgo8PC9TaXplIDUvUm9vdCAxIDAgUj4+CnN0YXJ0eHJlZgo0NTIK
+            JSVFT0YK
+            --boundary123--
+            """;
+        var e = EmlParser.Parse(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(raw)));
+        Assert.Equal(["report.pdf"], e.AttachmentNames);
+        Assert.Empty(e.InlineImages);
+    }
 }

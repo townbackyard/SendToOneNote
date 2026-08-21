@@ -1,0 +1,17 @@
+From: "noreply@example.edu" <noreply@example.edu>
+To: "pat@example.net" <pat@example.net>
+Subject: Payment Processed
+Date: Sat, 15 Aug 2026 13:39:07 +0000
+MIME-Version: 1.0
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
+
+Receipt Number: 1234567
+Customer: SAMPLE, PAT
+
+Description                                                        Amount
+------------------------------------------------------------------------
+Installment Plan Payment                                       $1,000.00
+                                                    Total      $1,000.00
+
+Thank you for the payment.

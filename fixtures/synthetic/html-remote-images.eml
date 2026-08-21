@@ -1,0 +1,23 @@
+From: Acme Newsletter <news@example.com>
+To: Pat Sample <pat@example.net>
+Subject: Weekly update: three things to know
+Date: Thu, 20 Aug 2026 18:00:35 +0000
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="b1"
+
+--b1
+Content-Type: text/plain; charset="utf-8"
+
+Three things to know this week.
+--b1
+Content-Type: text/html; charset="utf-8"
+
+<html><body>
+<h1>Weekly update</h1>
+<p>Three things to know this week.</p>
+<img src="https://img.example.com/banner.png" width="600">
+<table><tr><td>Item one</td><td><img src="https://img.example.com/icon1.png"></td></tr>
+<tr><td>Item two</td><td><img src="https://img.example.com/icon2.png"></td></tr></table>
+<p>See you next week.<br>The Acme Team</p>
+</body></html>
+--b1--

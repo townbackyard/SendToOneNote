@@ -82,10 +82,12 @@ public static class PagePlanner
 
     private static AppendPlan ToAppend(List<ResolvedImage> batch)
     {
+        // Graph rejects "replace" on a div target (20141); divs support
+        // append/prepend, so the image is appended INTO the slot div.
         var commands = batch.Select(i => new
         {
             target = $"#slot-{i.PartName}",
-            action = "replace",
+            action = "append",
             content = $"<img src=\"name:{i.PartName}\"/>"
         });
         return new AppendPlan(JsonSerializer.Serialize(commands),

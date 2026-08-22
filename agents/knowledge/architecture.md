@@ -45,7 +45,7 @@ The source email account never authenticates — content comes entirely from the
 
 - ≤4 MB per request → `PagePlanner.MaxRequestBytes = 3_500_000` safety cap.
 - ≤5 binary parts per request besides the `Presentation`/`Commands` part.
-- Overflow images: their `<img>` becomes `<div data-id="slot-imgN"/>` in the create request, then PATCH `[{target:"#slot-imgN", action:"replace", content:"<img src=\"name:imgN\"/>"}]` with the binary parts.
+- Overflow images: their `<img>` becomes `<div data-id="slot-imgN">&#160;</div>` in the create request (the nbsp is load-bearing — OneNote prunes EMPTY elements even with a data-id, error 20149), then PATCH `[{target:"#slot-imgN", action:"append", content:"<img src=\"name:imgN\"/>"}]` with the binary parts (`append`, not `replace` — Graph rejects replace on div targets, error 20141). A just-created page can 404 (error 20102) until indexed, so appends retry up to 5× with linear backoff.
 - Input must be well-formed UTF-8 XHTML; the service strips scripts/forms/complex CSS, tables lose rowspan/colspan. Email layouts simplify — that's the API, not a bug.
 - Section-group nesting deeper than one level requires recursive `GET /me/onenote/sectionGroups/{id}/sectionGroups` calls; `$expand` only goes one level down.
 - All GETs follow `@odata.nextLink` paging.

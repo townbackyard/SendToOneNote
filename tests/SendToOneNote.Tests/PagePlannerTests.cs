@@ -40,7 +40,7 @@ public class PagePlannerTests
         var cmds = JsonDocument.Parse(append.CommandsJson).RootElement;
         Assert.Equal(3, cmds.GetArrayLength());
         Assert.Equal("#slot-img5", cmds[0].GetProperty("target").GetString());
-        Assert.Equal("replace", cmds[0].GetProperty("action").GetString());
+        Assert.Equal("append", cmds[0].GetProperty("action").GetString());
         Assert.Contains("name:img5", cmds[0].GetProperty("content").GetString());
     }
 

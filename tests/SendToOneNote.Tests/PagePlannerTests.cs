@@ -32,7 +32,9 @@ public class PagePlannerTests
         var plan = PagePlanner.Plan(XhtmlWith(8), Images(8));
         Assert.Equal(5, plan.Parts.Count);
         Assert.DoesNotContain("name:img5", plan.PresentationXhtml);
-        Assert.Contains("data-id=\"slot-img5\"", plan.PresentationXhtml);
+        // Slot must NOT be empty: OneNote prunes empty elements (even with a
+        // data-id), which breaks the later PATCH with 20149 "target not found".
+        Assert.Contains("<div data-id=\"slot-img5\">&#160;</div>", plan.PresentationXhtml);
         var append = Assert.Single(plan.Appends);
         Assert.Equal(3, append.Parts.Count);
         var cmds = JsonDocument.Parse(append.CommandsJson).RootElement;

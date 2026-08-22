@@ -53,8 +53,11 @@ public static class PagePlanner
         var overflow = kept.Skip(firstBatch.Count).ToList();
         var presentation = xhtml;
         foreach (var img in overflow)
+            // &#160; placeholder: OneNote's importer prunes EMPTY elements even
+            // with a data-id, which makes the later PATCH fail with 20149
+            // "target not found". A nbsp keeps the slot alive.
             presentation = ImgTagRegex(img.PartName).Replace(presentation,
-                $"<div data-id=\"slot-{img.PartName}\"></div>");
+                $"<div data-id=\"slot-{img.PartName}\">&#160;</div>");
 
         var appends = new List<AppendPlan>();
         var batch = new List<ResolvedImage>();

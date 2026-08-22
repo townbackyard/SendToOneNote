@@ -6,7 +6,10 @@ namespace SendToOneNote.Core.Auth;
 
 public sealed class MsalTokenProvider : ITokenProvider
 {
-    public const string DefaultClientId = "00000000-0000-0000-0000-000000000000";
+    // Public identifier of the SendToOneNote app registration (townbackyard tenant,
+    // multi-tenant + personal accounts). Not a secret. BYO users override via
+    // settings.json ClientIdOverride — see docs/entra-app-registration.md.
+    public const string DefaultClientId = "e020383e-34ca-4fbe-928c-bf2f92001877";
     private static readonly string[] Scopes = ["User.Read", "Notes.ReadWrite"];
 
     private readonly IPublicClientApplication _pca;

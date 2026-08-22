@@ -135,6 +135,11 @@ public sealed class OneNoteClient
         }
         var page = new CreatedPage(id, clientUrl, webUrl);
 
+        // Large multipart pages can take minutes to become addressable
+        // (404/20102) — poll a cheap GET before attempting any writes.
+        if (plan.Appends.Count > 0)
+            await WaitUntilPageAddressableAsync(page.Id, ct);
+
         foreach (var append in plan.Appends)
         {
             // A freshly created page can briefly 404 (error 20102) until the
@@ -165,6 +170,25 @@ public sealed class OneNoteClient
             await Task.Delay(_appendRetryBaseDelay, ct);
         }
         return page;
+
+        async Task WaitUntilPageAddressableAsync(string pageId, CancellationToken ct2)
+        {
+            const int maxPolls = 36; // × base delay (2s default) ≈ 72s + request time
+            for (var poll = 1; ; poll++)
+            {
+                try
+                {
+                    await SendAsync(() => new HttpRequestMessage(HttpMethod.Get,
+                        $"{Base}/me/onenote/pages/{pageId}?$select=id"), ct2);
+                    return;
+                }
+                catch (OneNoteApiException ex) when (poll < maxPolls &&
+                    ex.StatusCode == 404 && ex.Message.Contains("20102"))
+                {
+                    await Task.Delay(_appendRetryBaseDelay, ct2);
+                }
+            }
+        }
 
         static string? Href(JsonElement doc, string name) =>
             doc.TryGetProperty("links", out var links) &&

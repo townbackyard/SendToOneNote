@@ -99,16 +99,19 @@ public class OneNoteClientTests
     {
         var responses = new Queue<HttpResponseMessage>([
             new(HttpStatusCode.Created) { Content = new StringContent(CreatedJson, Encoding.UTF8, "application/json") },
+            new(HttpStatusCode.OK) { Content = new StringContent("""{"id":"p1"}""", Encoding.UTF8, "application/json") },
             new(HttpStatusCode.NoContent)]);
         var stub = new StubHttpHandler(_ => responses.Dequeue());
         var plan = new PagePlan("<html><head><title>t</title></head><body/></html>", [],
             [new AppendPlan("""[{"target":"#slot-img0","action":"replace","content":"<img src=\"name:img0\"/>"}]""",
                 [new OneNoteRequestPart("img0", "image/png", [1])])]);
-        await new OneNoteClient(new FakeTokens(), stub).CreatePageAsync("s1", plan);
+        await new OneNoteClient(new FakeTokens(), stub, appendRetryBaseDelay: TimeSpan.Zero).CreatePageAsync("s1", plan);
 
-        Assert.Equal(2, stub.Requests.Count);
-        Assert.Equal(HttpMethod.Patch, stub.Requests[1].Method);
-        Assert.Contains("/me/onenote/pages/p1/content", stub.Requests[1].RequestUri!.ToString());
+        Assert.Equal(3, stub.Requests.Count); // create + addressability GET + PATCH
+        Assert.Equal(HttpMethod.Get, stub.Requests[1].Method);
+        Assert.Contains("/me/onenote/pages/p1", stub.Requests[1].RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Patch, stub.Requests[2].Method);
+        Assert.Contains("/me/onenote/pages/p1/content", stub.Requests[2].RequestUri!.ToString());
     }
 
     [Fact]
@@ -128,11 +131,13 @@ public class OneNoteClientTests
     [Fact]
     public async Task AppendRetriesWhileNewPageIsNotYetAddressable()
     {
-        // Live Graph returns 404/20102 when PATCHing a page created moments earlier.
+        // Live Graph returns 404/20102 until a freshly created page is indexed —
+        // the addressability GET polls until 200 before the PATCH runs.
         var responses = new Queue<HttpResponseMessage>([
             new(HttpStatusCode.Created) { Content = new StringContent(CreatedJson, Encoding.UTF8, "application/json") },
             new(HttpStatusCode.NotFound) { Content = new StringContent(NotIndexedYetJson) },
             new(HttpStatusCode.NotFound) { Content = new StringContent(NotIndexedYetJson) },
+            new(HttpStatusCode.OK) { Content = new StringContent("""{"id":"p1"}""", Encoding.UTF8, "application/json") },
             new(HttpStatusCode.NoContent)]);
         var stub = new StubHttpHandler(_ => responses.Dequeue());
         var plan = new PagePlan("<html><head><title>t</title></head><body/></html>", [],
@@ -143,8 +148,8 @@ public class OneNoteClientTests
             .CreatePageAsync("s1", plan);
 
         Assert.Equal("p1", page.Id);
-        Assert.Equal(4, stub.Requests.Count); // create + 2 retried PATCHes + successful PATCH
-        Assert.All(stub.Requests.Skip(1), r => Assert.Equal(HttpMethod.Patch, r.Method));
+        Assert.Equal(5, stub.Requests.Count); // create + 2 poll misses + poll hit + PATCH
+        Assert.Equal(HttpMethod.Patch, stub.Requests[^1].Method);
     }
 
     [Fact]
@@ -154,6 +159,7 @@ public class OneNoteClientTests
         var responses = new Queue<HttpResponseMessage>([
             new(HttpStatusCode.GatewayTimeout) { Content = new StringContent("""{"error":{"code":"UnknownError","message":""}}""") },
             new(HttpStatusCode.Created) { Content = new StringContent(CreatedJson, Encoding.UTF8, "application/json") },
+            new(HttpStatusCode.OK) { Content = new StringContent("""{"id":"p1"}""", Encoding.UTF8, "application/json") },
             new(HttpStatusCode.ServiceUnavailable) { Content = new StringContent("busy") },
             new(HttpStatusCode.Conflict) { Content = new StringContent("""{"error":{"code":"30103","message":"The user account has experienced too many simultaneous requests to the same location."}}""") },
             new(HttpStatusCode.NoContent)]);
@@ -166,7 +172,7 @@ public class OneNoteClientTests
             .CreatePageAsync("s1", plan);
 
         Assert.Equal("p1", page.Id);
-        Assert.Equal(5, stub.Requests.Count); // 504 create, retried create, 503 append, 409/30103 append, success
+        Assert.Equal(6, stub.Requests.Count); // 504 create, retried create, poll GET, 503 append, 409/30103 append, success
     }
 
     [Fact]
@@ -176,6 +182,9 @@ public class OneNoteClientTests
             req.Method == HttpMethod.Post
                 ? new HttpResponseMessage(HttpStatusCode.Created)
                 { Content = new StringContent(CreatedJson, Encoding.UTF8, "application/json") }
+                : req.Method == HttpMethod.Get
+                ? new HttpResponseMessage(HttpStatusCode.OK)
+                { Content = new StringContent("""{"id":"p1"}""", Encoding.UTF8, "application/json") }
                 : new HttpResponseMessage(HttpStatusCode.NotFound)
                 { Content = new StringContent(NotIndexedYetJson) });
         var plan = new PagePlan("<html><head><title>t</title></head><body/></html>", [],
@@ -186,7 +195,7 @@ public class OneNoteClientTests
             new OneNoteClient(new FakeTokens(), stub, appendRetryBaseDelay: TimeSpan.Zero)
                 .CreatePageAsync("s1", plan));
         Assert.Equal(404, ex.StatusCode);
-        Assert.Equal(9, stub.Requests.Count); // create + 8 PATCH attempts
+        Assert.Equal(10, stub.Requests.Count); // create + poll GET + 8 PATCH attempts
     }
 }
 

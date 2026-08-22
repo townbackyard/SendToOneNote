@@ -87,19 +87,38 @@ public sealed class OneNoteClient
         return all;
     }
 
+    // Gateway/throttling flakes seen against the live service, especially on
+    // large multipart requests. Retrying risks a rare duplicate if the timed-out
+    // request actually landed — accepted: a duplicate beats a failed save, and a
+    // manual re-drag carries the same risk.
+    private static bool IsTransient(OneNoteApiException ex) =>
+        ex.StatusCode is 429 or 502 or 503 or 504;
+
     public async Task<CreatedPage> CreatePageAsync(string sectionId, PagePlan plan,
         CancellationToken ct = default)
     {
-        var body = await SendAsync(() =>
+        string body;
+        for (var attempt = 1; ; attempt++)
         {
-            var content = new MultipartFormDataContent();
-            var pres = new StringContent(plan.PresentationXhtml, Encoding.UTF8, "application/xhtml+xml");
-            content.Add(pres, "Presentation");
-            foreach (var p in plan.Parts)
-                content.Add(MakeBinary(p), p.Name);
-            return new HttpRequestMessage(HttpMethod.Post,
-                $"{Base}/me/onenote/sections/{sectionId}/pages") { Content = content };
-        }, ct);
+            try
+            {
+                body = await SendAsync(() =>
+                {
+                    var content = new MultipartFormDataContent();
+                    var pres = new StringContent(plan.PresentationXhtml, Encoding.UTF8, "application/xhtml+xml");
+                    content.Add(pres, "Presentation");
+                    foreach (var p in plan.Parts)
+                        content.Add(MakeBinary(p), p.Name);
+                    return new HttpRequestMessage(HttpMethod.Post,
+                        $"{Base}/me/onenote/sections/{sectionId}/pages") { Content = content };
+                }, ct);
+                break;
+            }
+            catch (OneNoteApiException ex) when (attempt < 3 && IsTransient(ex))
+            {
+                await Task.Delay(_appendRetryBaseDelay * attempt, ct);
+            }
+        }
 
         string id;
         string? clientUrl, webUrl;
@@ -132,8 +151,8 @@ public sealed class OneNoteClient
                     }, ct);
                     break;
                 }
-                catch (OneNoteApiException ex) when (
-                    attempt < MaxAppendAttempts && ex.StatusCode == 404 && ex.Message.Contains("20102"))
+                catch (OneNoteApiException ex) when (attempt < MaxAppendAttempts &&
+                    (IsTransient(ex) || (ex.StatusCode == 404 && ex.Message.Contains("20102"))))
                 {
                     await Task.Delay(_appendRetryBaseDelay * attempt, ct);
                 }

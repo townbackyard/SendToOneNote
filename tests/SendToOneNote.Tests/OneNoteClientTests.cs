@@ -148,6 +148,27 @@ public class OneNoteClientTests
     }
 
     [Fact]
+    public async Task TransientGatewayErrorsAreRetriedOnCreateAndAppend()
+    {
+        // Live Graph intermittently 504s on large multipart requests.
+        var responses = new Queue<HttpResponseMessage>([
+            new(HttpStatusCode.GatewayTimeout) { Content = new StringContent("""{"error":{"code":"UnknownError","message":""}}""") },
+            new(HttpStatusCode.Created) { Content = new StringContent(CreatedJson, Encoding.UTF8, "application/json") },
+            new(HttpStatusCode.ServiceUnavailable) { Content = new StringContent("busy") },
+            new(HttpStatusCode.NoContent)]);
+        var stub = new StubHttpHandler(_ => responses.Dequeue());
+        var plan = new PagePlan("<html><head><title>t</title></head><body/></html>", [],
+            [new AppendPlan("""[{"target":"#slot-img0","action":"append","content":"<img src=\"name:img0\"/>"}]""",
+                [new OneNoteRequestPart("img0", "image/png", [1])])]);
+
+        var page = await new OneNoteClient(new FakeTokens(), stub, appendRetryBaseDelay: TimeSpan.Zero)
+            .CreatePageAsync("s1", plan);
+
+        Assert.Equal("p1", page.Id);
+        Assert.Equal(4, stub.Requests.Count); // 504 create + retried create + 503 append + retried append
+    }
+
+    [Fact]
     public async Task AppendGivesUpAfterRetryCapAndSurfacesError()
     {
         var stub = new StubHttpHandler(req =>

@@ -55,7 +55,9 @@ public sealed class TrayContext : IDisposable
             {
                 Text = "N",
                 Background = Brushes.SteelBlue,
-                Foreground = Brushes.White
+                Foreground = Brushes.White,
+                FontSize = 96,
+                FontWeight = FontWeights.Bold
             }
         };
         // Subscribe once — the handler always opens whatever page the most recent

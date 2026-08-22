@@ -87,12 +87,16 @@ public sealed class OneNoteClient
         return all;
     }
 
-    // Gateway/throttling flakes seen against the live service, especially on
-    // large multipart requests. Retrying risks a rare duplicate if the timed-out
-    // request actually landed — accepted: a duplicate beats a failed save, and a
-    // manual re-drag carries the same risk.
-    private static bool IsTransient(OneNoteApiException ex) =>
-        ex.StatusCode is 429 or 502 or 503 or 504;
+    // Flakes seen against the live service, especially on large multipart
+    // requests. Retrying risks a rare duplicate if a timed-out request actually
+    // landed — accepted: a duplicate beats a failed save, and a manual re-drag
+    // carries the same risk.
+    //   404/20102 — page created moments ago, not yet addressable
+    //   409/30103 — per-location write throttle on rapid sequential writes
+    private static bool IsRetryable(OneNoteApiException ex) =>
+        ex.StatusCode is 429 or 502 or 503 or 504
+        || (ex.StatusCode == 404 && ex.Message.Contains("20102"))
+        || (ex.StatusCode == 409 && ex.Message.Contains("30103"));
 
     public async Task<CreatedPage> CreatePageAsync(string sectionId, PagePlan plan,
         CancellationToken ct = default)
@@ -114,7 +118,7 @@ public sealed class OneNoteClient
                 }, ct);
                 break;
             }
-            catch (OneNoteApiException ex) when (attempt < 3 && IsTransient(ex))
+            catch (OneNoteApiException ex) when (attempt < 3 && IsRetryable(ex))
             {
                 await Task.Delay(_appendRetryBaseDelay * attempt, ct);
             }
@@ -151,12 +155,14 @@ public sealed class OneNoteClient
                     }, ct);
                     break;
                 }
-                catch (OneNoteApiException ex) when (attempt < MaxAppendAttempts &&
-                    (IsTransient(ex) || (ex.StatusCode == 404 && ex.Message.Contains("20102"))))
+                catch (OneNoteApiException ex) when (attempt < MaxAppendAttempts && IsRetryable(ex))
                 {
                     await Task.Delay(_appendRetryBaseDelay * attempt, ct);
                 }
             }
+            // Pace sequential writes to the same page — rapid back-to-back
+            // appends trip OneNote's 30103 per-location throttle.
+            await Task.Delay(_appendRetryBaseDelay, ct);
         }
         return page;
 

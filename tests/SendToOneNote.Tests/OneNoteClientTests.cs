@@ -155,6 +155,7 @@ public class OneNoteClientTests
             new(HttpStatusCode.GatewayTimeout) { Content = new StringContent("""{"error":{"code":"UnknownError","message":""}}""") },
             new(HttpStatusCode.Created) { Content = new StringContent(CreatedJson, Encoding.UTF8, "application/json") },
             new(HttpStatusCode.ServiceUnavailable) { Content = new StringContent("busy") },
+            new(HttpStatusCode.Conflict) { Content = new StringContent("""{"error":{"code":"30103","message":"The user account has experienced too many simultaneous requests to the same location."}}""") },
             new(HttpStatusCode.NoContent)]);
         var stub = new StubHttpHandler(_ => responses.Dequeue());
         var plan = new PagePlan("<html><head><title>t</title></head><body/></html>", [],
@@ -165,7 +166,7 @@ public class OneNoteClientTests
             .CreatePageAsync("s1", plan);
 
         Assert.Equal("p1", page.Id);
-        Assert.Equal(4, stub.Requests.Count); // 504 create + retried create + 503 append + retried append
+        Assert.Equal(5, stub.Requests.Count); // 504 create, retried create, 503 append, 409/30103 append, success
     }
 
     [Fact]

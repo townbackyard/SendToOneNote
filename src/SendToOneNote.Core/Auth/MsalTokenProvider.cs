@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Microsoft.Identity.Client;
 using Microsoft.Identity.Client.Broker;
 using Microsoft.Identity.Client.Extensions.Msal;
@@ -27,9 +28,25 @@ public sealed class MsalTokenProvider : ITokenProvider
             .Create(string.IsNullOrWhiteSpace(clientIdOverride) ? DefaultClientId : clientIdOverride)
             .WithAuthority("https://login.microsoftonline.com/common")
             .WithBroker(new BrokerOptions(BrokerOptions.OperatingSystems.Windows))
-            .WithParentActivityOrWindow(() => parentWindow)
+            .WithParentActivityOrWindow(() => ResolveParentWindow(parentWindow))
             .Build();
     }
+
+    // The WAM broker rejects IntPtr.Zero (MSAL: "A window handle must be configured").
+    // Resolved at sign-in time: the caller-configured handle wins; otherwise the
+    // window the user is interacting with right now; otherwise the desktop window.
+    public static IntPtr ResolveParentWindow(IntPtr configured)
+    {
+        if (configured != IntPtr.Zero) return configured;
+        var foreground = GetForegroundWindow();
+        return foreground != IntPtr.Zero ? foreground : GetDesktopWindow();
+    }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetDesktopWindow();
 
     public async Task<string> GetAccessTokenAsync(bool interactiveAllowed, CancellationToken ct = default)
     {

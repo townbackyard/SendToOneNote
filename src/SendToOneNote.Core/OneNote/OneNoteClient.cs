@@ -16,14 +16,18 @@ public sealed class OneNoteApiException(int statusCode, string message) : Except
 public sealed class OneNoteClient
 {
     private const string Base = "https://graph.microsoft.com/v1.0";
+    private const int MaxAppendAttempts = 5;
     private readonly ITokenProvider _tokens;
     private readonly HttpClient _http;
+    private readonly TimeSpan _appendRetryBaseDelay;
 
-    public OneNoteClient(ITokenProvider tokens, HttpMessageHandler? handler = null)
+    public OneNoteClient(ITokenProvider tokens, HttpMessageHandler? handler = null,
+        TimeSpan? appendRetryBaseDelay = null)
     {
         _tokens = tokens;
         _http = handler is null ? new HttpClient() : new HttpClient(handler);
         _http.Timeout = TimeSpan.FromSeconds(100);
+        _appendRetryBaseDelay = appendRetryBaseDelay ?? TimeSpan.FromSeconds(2);
     }
 
     public async Task<NotebookTree> GetNotebookTreeAsync(CancellationToken ct = default)
@@ -108,16 +112,30 @@ public sealed class OneNoteClient
 
         foreach (var append in plan.Appends)
         {
-            await SendAsync(() =>
+            // A freshly created page can briefly 404 (error 20102) until the
+            // service has indexed it — retry those with linear backoff.
+            for (var attempt = 1; ; attempt++)
             {
-                var content = new MultipartFormDataContent();
-                content.Add(new StringContent(append.CommandsJson, Encoding.UTF8, "application/json"),
-                    "Commands");
-                foreach (var p in append.Parts)
-                    content.Add(MakeBinary(p), p.Name);
-                return new HttpRequestMessage(HttpMethod.Patch,
-                    $"{Base}/me/onenote/pages/{page.Id}/content") { Content = content };
-            }, ct);
+                try
+                {
+                    await SendAsync(() =>
+                    {
+                        var content = new MultipartFormDataContent();
+                        content.Add(new StringContent(append.CommandsJson, Encoding.UTF8, "application/json"),
+                            "Commands");
+                        foreach (var p in append.Parts)
+                            content.Add(MakeBinary(p), p.Name);
+                        return new HttpRequestMessage(HttpMethod.Patch,
+                            $"{Base}/me/onenote/pages/{page.Id}/content") { Content = content };
+                    }, ct);
+                    break;
+                }
+                catch (OneNoteApiException ex) when (
+                    attempt < MaxAppendAttempts && ex.StatusCode == 404 && ex.Message.Contains("20102"))
+                {
+                    await Task.Delay(_appendRetryBaseDelay * attempt, ct);
+                }
+            }
         }
         return page;
 

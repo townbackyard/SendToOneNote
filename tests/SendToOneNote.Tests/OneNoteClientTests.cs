@@ -121,4 +121,50 @@ public class OneNoteClientTests
         Assert.Equal(403, ex.StatusCode);
         Assert.Contains("nope", ex.Message);
     }
+
+    private const string NotIndexedYetJson =
+        """{"error":{"code":"20102","message":"The specified resource ID does not exist."}}""";
+
+    [Fact]
+    public async Task AppendRetriesWhileNewPageIsNotYetAddressable()
+    {
+        // Live Graph returns 404/20102 when PATCHing a page created moments earlier.
+        var responses = new Queue<HttpResponseMessage>([
+            new(HttpStatusCode.Created) { Content = new StringContent(CreatedJson, Encoding.UTF8, "application/json") },
+            new(HttpStatusCode.NotFound) { Content = new StringContent(NotIndexedYetJson) },
+            new(HttpStatusCode.NotFound) { Content = new StringContent(NotIndexedYetJson) },
+            new(HttpStatusCode.NoContent)]);
+        var stub = new StubHttpHandler(_ => responses.Dequeue());
+        var plan = new PagePlan("<html><head><title>t</title></head><body/></html>", [],
+            [new AppendPlan("""[{"target":"#slot-img0","action":"replace","content":"<img src=\"name:img0\"/>"}]""",
+                [new OneNoteRequestPart("img0", "image/png", [1])])]);
+
+        var page = await new OneNoteClient(new FakeTokens(), stub, appendRetryBaseDelay: TimeSpan.Zero)
+            .CreatePageAsync("s1", plan);
+
+        Assert.Equal("p1", page.Id);
+        Assert.Equal(4, stub.Requests.Count); // create + 2 retried PATCHes + successful PATCH
+        Assert.All(stub.Requests.Skip(1), r => Assert.Equal(HttpMethod.Patch, r.Method));
+    }
+
+    [Fact]
+    public async Task AppendGivesUpAfterRetryCapAndSurfacesError()
+    {
+        var stub = new StubHttpHandler(req =>
+            req.Method == HttpMethod.Post
+                ? new HttpResponseMessage(HttpStatusCode.Created)
+                { Content = new StringContent(CreatedJson, Encoding.UTF8, "application/json") }
+                : new HttpResponseMessage(HttpStatusCode.NotFound)
+                { Content = new StringContent(NotIndexedYetJson) });
+        var plan = new PagePlan("<html><head><title>t</title></head><body/></html>", [],
+            [new AppendPlan("""[{"target":"#slot-img0","action":"replace","content":"<img src=\"name:img0\"/>"}]""",
+                [new OneNoteRequestPart("img0", "image/png", [1])])]);
+
+        var ex = await Assert.ThrowsAsync<OneNoteApiException>(() =>
+            new OneNoteClient(new FakeTokens(), stub, appendRetryBaseDelay: TimeSpan.Zero)
+                .CreatePageAsync("s1", plan));
+        Assert.Equal(404, ex.StatusCode);
+        Assert.Equal(6, stub.Requests.Count); // create + 5 PATCH attempts
+    }
 }
+

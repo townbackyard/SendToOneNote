@@ -41,4 +41,35 @@ public class IntegrationSmokeTests
         var page = await client.CreatePageAsync(scratch!.Id, plan);
         Assert.NotEmpty(page.Id);
     }
+
+    [SkippableFact]
+    public async Task Experiment_SinglePostWithTwentyParts()
+    {
+        // Probes the REAL per-request binary-part limit. Microsoft documents ~6
+        // multipart sections per POST, which forces the append dance for
+        // image-heavy emails — but if the live service accepts 20 parts in one
+        // request, most emails become a single-shot save and appends become a
+        // rare fallback. 201 => the documented limit is conservative; a 4xx
+        // tells us the real ceiling.
+        Skip.If(Environment.GetEnvironmentVariable("STN_INTEGRATION") != "1",
+            "Set STN_INTEGRATION=1 to run against the real Graph API.");
+        var tokens = new MsalTokenProvider(Path.Combine(Path.GetTempPath(), "stn-int"));
+        var client = new OneNoteClient(tokens);
+        var tree = await client.GetNotebookTreeAsync();
+        var scratch = tree.Notebooks.SelectMany(n => n.Sections)
+            .FirstOrDefault(s => s.Name == "SendToOneNote Test");
+        Skip.If(scratch is null, "Create a section named 'SendToOneNote Test' first.");
+
+        var imgTags = string.Concat(Enumerable.Range(0, 20).Select(i => $"<img src=\"name:img{i}\"/>"));
+        var xhtml =
+            $"<html><head><title>Experiment: 20 parts, one POST</title></head><body>{imgTags}</body></html>";
+        var parts = Enumerable.Range(0, 20)
+            .Select(i => new OneNoteRequestPart($"img{i}", "image/png", (byte[])PngBytes.Clone()))
+            .ToList();
+        // Bypass PagePlanner deliberately: one create request, zero appends.
+        var plan = new PagePlan(xhtml, parts, []);
+
+        var page = await client.CreatePageAsync(scratch!.Id, plan);
+        Assert.NotEmpty(page.Id);
+    }
 }

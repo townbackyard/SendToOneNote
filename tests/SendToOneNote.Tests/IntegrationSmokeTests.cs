@@ -25,18 +25,18 @@ public class IntegrationSmokeTests
             .FirstOrDefault(s => s.Name == "SendToOneNote Test");
         Skip.If(scratch is null, "Create a section named 'SendToOneNote Test' first.");
 
-        // Build the PagePlan via the real production pieces: 7 images through
-        // PagePlanner.Plan forces at least one PATCH append batch, since only 5
-        // binary parts fit in the initial create request (MaxBinaryPartsPerRequest).
-        var imgTags = string.Concat(Enumerable.Range(0, 7).Select(i => $"<img src=\"name:img{i}\"/>"));
+        // Build the PagePlan via the real production pieces: 33 images through
+        // PagePlanner.Plan forces at least one PATCH append batch past the 30
+        // binary parts that fit in the initial create request.
+        var imgTags = string.Concat(Enumerable.Range(0, 33).Select(i => $"<img src=\"name:img{i}\"/>"));
         var xhtml =
             $"<html><head><title>Integration smoke (images+append)</title></head><body>{imgTags}</body></html>";
-        var images = Enumerable.Range(0, 7)
+        var images = Enumerable.Range(0, 33)
             .Select(i => new ResolvedImage($"img{i}", "image/png", (byte[])PngBytes.Clone()))
             .ToList();
         var plan = PagePlanner.Plan(xhtml, images);
         Assert.True(plan.Appends.Count >= 1,
-            "7 images with a 5-part-per-request cap should force at least one append batch.");
+            "33 images with a 30-part-per-request cap should force at least one append batch.");
 
         var page = await client.CreatePageAsync(scratch!.Id, plan);
         Assert.NotEmpty(page.Id);

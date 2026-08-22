@@ -32,7 +32,7 @@ Detailed docs in `agents/`:
 - **.NET 10**, TFM `net10.0-windows`, Windows-only, WPF. Solution file is `SendToOneNote.slnx` (XML solution format — do not add a classic `.sln`).
 - **Approved dependencies:** MimeKit, AngleSharp, Microsoft.Identity.Client (+ .Broker, + .Extensions.Msal), H.NotifyIcon.Wpf, System.Drawing.Common, xUnit (+ Xunit.SkippableFact). Adding any other package is a decision, not a convenience — surface it as an Open Question first.
 - **System.Drawing.Common is deliberate** (Windows-only desktop app is its supported scenario; isolated behind `ImageShrinker`). Don't propose SkiaSharp/ImageSharp migrations without a reason.
-- **Graph OneNote API hard limits:** ≤4 MB per request (3.5 MB safety cap in `PagePlanner`), ≤5 binary parts per request, aggressive XHTML sanitization. These shape the page-creation design; don't "simplify" them away.
+- **Graph OneNote API hard limits:** ≤4 MB per request (3.5 MB safety cap in `PagePlanner`) — the binding constraint; up to 30 binary parts per request (docs claim ~6, live service verified higher); aggressive XHTML sanitization. These shape the page-creation design; don't "simplify" them away.
 - **Delegated scopes exactly:** `User.Read`, `Notes.ReadWrite`. Authority `https://login.microsoftonline.com/common`. Never request broader scopes.
 
 ## Planning & Scope Rules

@@ -43,8 +43,8 @@ The source email account never authenticates — content comes entirely from the
 
 ## Graph OneNote API constraints (load-bearing)
 
-- ≤4 MB per request → `PagePlanner.MaxRequestBytes = 3_500_000` safety cap.
-- ≤5 binary parts per request besides the `Presentation`/`Commands` part.
+- ≤4 MB per request → `PagePlanner.MaxRequestBytes = 3_500_000` safety cap — this is the real binding constraint.
+- Binary parts per request: Microsoft documents ~6 multipart sections, but the live service accepted 20 in one POST (verified 2026-08-21); `MaxBinaryPartsPerRequest = 30`. Most emails therefore save in one atomic request; the slot/append fallback only triggers past these caps.
 - Overflow images: their `<img>` becomes `<div data-id="slot-imgN">&#160;</div>` in the create request (the nbsp is load-bearing — OneNote prunes EMPTY elements even with a data-id, error 20149), then PATCH `[{target:"#slot-imgN", action:"append", content:"<img src=\"name:imgN\"/>"}]` with the binary parts (`append`, not `replace` — Graph rejects replace on div targets, error 20141). A just-created page can 404 (error 20102) until indexed; rapid sequential writes to the same page trip the 409/30103 per-location throttle (batches are paced ~2s apart); gateways intermittently 429/502/503/504 on large multiparts. All of these are retryable — appends retry up to 8× with linear backoff, creates up to 3×.
 - Input must be well-formed UTF-8 XHTML; the service strips scripts/forms/complex CSS, tables lose rowspan/colspan. Email layouts simplify — that's the API, not a bug.
 - Section-group nesting deeper than one level requires recursive `GET /me/onenote/sectionGroups/{id}/sectionGroups` calls; `$expand` only goes one level down.

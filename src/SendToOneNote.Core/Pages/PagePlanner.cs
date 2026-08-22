@@ -12,7 +12,12 @@ public sealed record PagePlan(string PresentationXhtml, IReadOnlyList<OneNoteReq
 public static class PagePlanner
 {
     public const int MaxRequestBytes = 3_500_000;
-    public const int MaxBinaryPartsPerRequest = 5;
+    // Microsoft documents ~6 multipart sections per POST, but the live service
+    // accepted 20 binary parts in one request (verified 2026-08-21). 30 matches
+    // the API's documented images-per-POST figure; the 4 MB byte cap is the real
+    // binding constraint. Most emails therefore save in ONE request — the
+    // slot/append fallback below only triggers past these caps.
+    public const int MaxBinaryPartsPerRequest = 30;
 
     // Matches the whole <img .../> element for a given part name regardless of other
     // attributes or their order (AngleSharp's XHTML serializer may emit alt/width/style/etc.

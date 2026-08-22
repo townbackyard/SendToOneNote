@@ -45,7 +45,8 @@ Remote images are downloaded and embedded so pages outlive expiring links.
 
 - Drag-out from new Outlook sometimes needs the message clicked first
   (known Outlook regression); "… → Save as" always works.
-- Failed saves land in the drop folder's Failed subfolder; logs in
+- Failed saves land in the drop folder's Failed subfolder, each with a
+  matching .error.txt explaining what went wrong; full logs in
   %APPDATA%\SendToOneNote\logs.
 - Emails dropped into the folder while SendToOneNote is not running are not
   picked up automatically — start the app and drag the file out and back in

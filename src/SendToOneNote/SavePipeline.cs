@@ -76,20 +76,25 @@ public sealed class SavePipeline(
 
             if (settings.DeleteOnSuccess) File.Delete(path);
             log.Info($"Saved '{email.Subject}' to {pick.SectionName}");
-            Saved?.Invoke($"Saved to {pick.SectionName}", page.ClientUrl);
+            // A broken notifier must never convert a completed save into the
+            // failure path — the page exists and the .eml is already handled.
+            try { Saved?.Invoke($"Saved to {pick.SectionName}", page.ClientUrl); }
+            catch (Exception notifyEx) { log.Error("Success notification failed (the email WAS saved)", notifyEx); }
         }
         catch (Exception ex)
         {
             log.Error($"Failed for {path}", ex);
-            MoveToFailed(path);
-            Failed?.Invoke(ex switch
+            var reason = ex switch
             {
                 EmlParseException => "That file isn't a readable email.",
                 AuthRequiredException => "Sign-in required — open SendToOneNote from the tray.",
                 OneNoteApiException o => $"OneNote API error {o.StatusCode}.",
                 HttpRequestException => "You appear to be offline. The email was moved to the Failed folder — drag it back into the drop folder to retry.",
                 _ => "Unexpected error — see log."
-            });
+            };
+            MoveToFailed(path, reason, ex);
+            try { Failed?.Invoke(reason); }
+            catch (Exception notifyEx) { log.Error("Failure notification failed", notifyEx); }
         }
         finally
         {
@@ -104,13 +109,31 @@ public sealed class SavePipeline(
         return tree;
     }
 
-    private void MoveToFailed(string path)
+    private void MoveToFailed(string path, string reason, Exception ex)
     {
         try
         {
+            // Already gone (e.g. deleted after a successful save whose notification
+            // then failed, or a duplicate event): nothing to move, nothing to explain.
+            if (!File.Exists(path)) return;
             var failed = Path.Combine(Path.GetDirectoryName(path)!, "Failed");
             Directory.CreateDirectory(failed);
-            File.Move(path, Path.Combine(failed, Path.GetFileName(path)), overwrite: true);
+            var dest = Path.Combine(failed, Path.GetFileName(path));
+            File.Move(path, dest, overwrite: true);
+            // Sidecar so the user can see WHY without hunting for the app log.
+            File.WriteAllText(dest + ".error.txt",
+                $"""
+                {DateTime.Now:yyyy-MM-dd HH:mm:ss}  SendToOneNote could not save this email.
+
+                {reason}
+
+                To retry: drag the .eml file back into the drop folder.
+
+                Technical detail:
+                {ex}
+
+                Full log: %APPDATA%\SendToOneNote\logs
+                """);
         }
         catch (Exception moveEx) { log.Error($"Could not move {path} to Failed", moveEx); }
     }

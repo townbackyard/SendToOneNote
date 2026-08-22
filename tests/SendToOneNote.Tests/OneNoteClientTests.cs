@@ -164,7 +164,7 @@ public class OneNoteClientTests
             new OneNoteClient(new FakeTokens(), stub, appendRetryBaseDelay: TimeSpan.Zero)
                 .CreatePageAsync("s1", plan));
         Assert.Equal(404, ex.StatusCode);
-        Assert.Equal(6, stub.Requests.Count); // create + 5 PATCH attempts
+        Assert.Equal(9, stub.Requests.Count); // create + 8 PATCH attempts
     }
 }
 

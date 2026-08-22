@@ -80,6 +80,9 @@ public sealed class TrayContext : IDisposable
         });
         AddItem(menu, "Exit", () => Application.Current.Shutdown());
         _icon.ContextMenu = menu;
+        // Creates the native notification-area icon. Without this the icon never
+        // appears and ShowNotification throws "TrayIcon is not created".
+        _icon.ForceCreate();
         _log.Info("Started");
     }
 
@@ -92,11 +95,17 @@ public sealed class TrayContext : IDisposable
 
     private void Notify(string title, string message, string? url, NotificationIcon icon = NotificationIcon.Warning)
     {
-        Application.Current.Dispatcher.Invoke(() =>
+        // A toast is a courtesy — a notification failure must never propagate
+        // into whatever pipeline path asked for it.
+        try
         {
-            _lastUrl = url;
-            _icon?.ShowNotification(title, message, icon);
-        });
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                _lastUrl = url;
+                _icon?.ShowNotification(title, message, icon);
+            });
+        }
+        catch (Exception ex) { _log.Error($"Toast failed: {title} — {message}", ex); }
     }
 
     public void Dispose()

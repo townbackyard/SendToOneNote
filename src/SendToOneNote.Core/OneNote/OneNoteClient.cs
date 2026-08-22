@@ -16,7 +16,9 @@ public sealed class OneNoteApiException(int statusCode, string message) : Except
 public sealed class OneNoteClient
 {
     private const string Base = "https://graph.microsoft.com/v1.0";
-    private const int MaxAppendAttempts = 5;
+    // Large multipart pages (many images) can take well over 20s to become
+    // addressable after creation; 8 attempts at linear 2s backoff waits ~56s.
+    private const int MaxAppendAttempts = 8;
     private readonly ITokenProvider _tokens;
     private readonly HttpClient _http;
     private readonly TimeSpan _appendRetryBaseDelay;

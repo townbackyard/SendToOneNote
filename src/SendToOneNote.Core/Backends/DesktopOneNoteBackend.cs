@@ -26,24 +26,32 @@ public sealed class DesktopOneNoteBackend : IOneNoteBackend
     public string Name => "desktop";
 
     public Task<NotebookTree> GetTreeAsync(CancellationToken ct = default) =>
-        _worker.RunAsync(() => Guard(() =>
+        _worker.RunAsync(() =>
         {
-            App.GetHierarchy("", OneNoteConstants.HsSections, out var xml, OneNoteConstants.Xs2013);
-            return HierarchyParser.Parse(xml);
-        }));
+            ct.ThrowIfCancellationRequested();
+            return Guard(() =>
+            {
+                App.GetHierarchy("", OneNoteConstants.HsSections, out var xml, OneNoteConstants.Xs2013);
+                return HierarchyParser.Parse(xml);
+            });
+        });
 
     public Task<CreatedPage> CreatePageAsync(string sectionId, string pageXhtml, IReadOnlyList<ResolvedImage> images,
         CancellationToken ct = default) =>
-        _worker.RunAsync(() => Guard(() =>
+        _worker.RunAsync(() =>
         {
-            var title = OneNotePageXmlBuilder.ExtractTitle(pageXhtml);
-            var html = DataUriInliner.Inline(pageXhtml, images);
-            App.CreateNewPage(sectionId, out var pageId, OneNoteConstants.NpsDefault);
-            App.UpdatePageContent(OneNotePageXmlBuilder.Build(pageId, title, html),
-                DateTime.MinValue, OneNoteConstants.Xs2013, false);
-            App.GetHyperlinkToObject(pageId, "", out var link);
-            return new CreatedPage(pageId, link, null);
-        }));
+            ct.ThrowIfCancellationRequested();
+            return Guard(() =>
+            {
+                var title = OneNotePageXmlBuilder.ExtractTitle(pageXhtml);
+                var html = DataUriInliner.Inline(pageXhtml, images);
+                App.CreateNewPage(sectionId, out var pageId, OneNoteConstants.NpsDefault);
+                App.UpdatePageContent(OneNotePageXmlBuilder.Build(pageId, title, html),
+                    DateTime.MinValue, OneNoteConstants.Xs2013, false);
+                App.GetHyperlinkToObject(pageId, "", out var link);
+                return new CreatedPage(pageId, link, null);
+            });
+        });
 
     private IApplication App => _app ??= _factory();
 
@@ -54,10 +62,31 @@ public sealed class DesktopOneNoteBackend : IOneNoteBackend
         return (IApplication)Activator.CreateInstance(type)!;
     }
 
-    private static T Guard<T>(Func<T> work)
+    private T Guard<T>(Func<T> work)
     {
         try { return work(); }
-        catch (COMException ex) { throw new DesktopOneNoteException(ex.HResult, Describe(ex)); }
+        catch (COMException ex)
+        {
+            // RPC/connection-class HRESULTs mean the RCW is dead (OneNote exited or
+            // restarted mid-session) — drop it so the next call re-activates instead
+            // of failing identically forever. A read-only-section or malformed-XML
+            // error is a healthy connection saying no, so the cache must survive those.
+            if (IsConnectionLost((uint)ex.HResult)) DropApp();
+            throw new DesktopOneNoteException(ex.HResult, Describe(ex));
+        }
+    }
+
+    private static bool IsConnectionLost(uint hresult) => hresult is
+        0x80010108 // RPC_E_DISCONNECTED
+        or 0x800401FD // CO_E_OBJNOTCONNECTED
+        or 0x8001010E // RPC_E_WRONG_THREAD
+        or 0x8000FFFF; // E_UNEXPECTED
+
+    private void DropApp()
+    {
+        var app = _app;
+        _app = null;
+        if (app is not null && Marshal.IsComObject(app)) Marshal.ReleaseComObject(app);
     }
 
     // Best-known OneNote API HRESULTs (0x80042000 range); everything else is generic.

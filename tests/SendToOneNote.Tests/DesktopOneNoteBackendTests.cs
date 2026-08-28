@@ -63,4 +63,50 @@ public class DesktopOneNoteBackendTests
         Assert.Equal(unchecked((int)0x8004200B), ex.HResultCode);
         Assert.Contains("read-only", ex.Message);
     }
+
+    [Fact]
+    public async Task ReactivatesAfterRpcDisconnection()
+    {
+        using var w = new StaComWorker();
+        var fake = new FakeOneNoteApplication { ThrowOnUpdate = new COMException("gone", unchecked((int)0x80010108)) };
+        var factoryCalls = 0;
+        var backend = new DesktopOneNoteBackend(w, () => { factoryCalls++; return fake; });
+
+        await Assert.ThrowsAsync<DesktopOneNoteException>(() => backend.CreatePageAsync("{S1}", Xhtml, []));
+        Assert.Equal(1, factoryCalls);
+
+        fake.ThrowOnUpdate = null;
+        var page = await backend.CreatePageAsync("{S1}", Xhtml, []);
+
+        Assert.Equal(2, factoryCalls);
+        Assert.Equal("{P1}{1}{B0}", page.Id);
+    }
+
+    [Fact]
+    public async Task DoesNotReactivateOnNonConnectionComException()
+    {
+        using var w = new StaComWorker();
+        var fake = new FakeOneNoteApplication { ThrowOnUpdate = new COMException("boom", unchecked((int)0x8004200B)) };
+        var factoryCalls = 0;
+        var backend = new DesktopOneNoteBackend(w, () => { factoryCalls++; return fake; });
+
+        await Assert.ThrowsAsync<DesktopOneNoteException>(() => backend.CreatePageAsync("{S1}", Xhtml, []));
+        await Assert.ThrowsAsync<DesktopOneNoteException>(() => backend.CreatePageAsync("{S1}", Xhtml, []));
+
+        Assert.Equal(1, factoryCalls);
+    }
+
+    [Fact]
+    public async Task AlreadyCancelledTokenSkipsComCalls()
+    {
+        using var w = new StaComWorker();
+        var fake = new FakeOneNoteApplication();
+        var backend = new DesktopOneNoteBackend(w, () => fake);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => backend.CreatePageAsync("{S1}", Xhtml, [], cts.Token));
+        Assert.Empty(fake.CreatedPages);
+    }
 }

@@ -26,6 +26,10 @@
 - `CancellationToken ct = default` as the last parameter on public async APIs in Core.
 - Fire-and-forget (`_ = SomethingAsync()`) only for genuinely optional background work (e.g., the tree-cache refresh), and the method must swallow-and-log, never throw unobserved.
 
+## COM (desktop OneNote)
+
+- All OneNote COM calls go through `StaComWorker`; never `dynamic`/`InvokeMember` on the OneNote RCW (Click-to-Run's type library is invisible outside its virtualized registry hive, so late binding fails with `TYPE_E_LIBNOTREGISTERED`). Call through the hand-declared `IApplication` vtable interface in `Core/Desktop/OneNoteInterop.cs` instead.
+
 ## Dependencies
 
 Approved list (see AGENTS.md): MimeKit, AngleSharp, MSAL trio, H.NotifyIcon.Wpf, System.Drawing.Common, xUnit + SkippableFact. Anything else is an Open Question first. In particular:

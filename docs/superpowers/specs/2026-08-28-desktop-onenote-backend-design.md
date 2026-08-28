@@ -1,7 +1,7 @@
 # SendToOneNote v1.1 — Desktop OneNote Backend (COM primary, Graph fallback)
 
 Date: 2026-08-28
-Status: Draft for review
+Status: Accepted 2026-08-28 (implemented by docs/superpowers/plans/2026-08-28-desktop-onenote-backend.md)
 Supersedes parts of: `2026-08-21-sendtoonenote-design.md` (the "Auth" and "Page creation" sections become Graph-fallback-only)
 
 ## Problem

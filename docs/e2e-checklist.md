@@ -10,3 +10,9 @@
 - [ ] Non-.eml file dropped → ignored, one log line
 - [ ] Quit + relaunch → silent auth (no prompt), recents preserved
 - [ ] Fresh Windows user / second machine → first-run flow works end to end
+- [ ] Fresh first-run on a machine with desktop OneNote shows no sign-in step
+- [ ] Image-heavy newsletter saves within seconds and is visible in OneNote immediately (no "Page Not Yet Available")
+- [ ] Saved page contains no tracking pixel (check page for stray 1x1 images)
+- [ ] `"Backend": "graph"` forces the cloud path (tooltip says cloud; sign-in appears; save works)
+- [ ] `"ImageDiagnostics": true` writes Diagnostics\<email>\images.csv with sensible decisions
+- [ ] Picker shows local-only notebooks on the desktop path

@@ -1,6 +1,6 @@
 # SendToOneNote — AI Agent Guide
 
-SendToOneNote is a **.NET 10 WPF Windows tray app** (MIT, open source) that brings classic Outlook's "Send to OneNote" back for new Outlook — including Gmail/IMAP accounts where Outlook add-ins can't run. Drag an email (.eml) into a watched folder → section-picker dialog → the email becomes a OneNote page via the Microsoft Graph OneNote API (subject as title, From/To/Date block, HTML body with embedded images).
+SendToOneNote is a **.NET 10 WPF Windows tray app** (MIT, open source) that brings classic Outlook's "Send to OneNote" back for new Outlook — including Gmail/IMAP accounts where Outlook add-ins can't run. Drag an email (.eml) into a watched folder → section-picker dialog → the email becomes a OneNote page (subject as title, From/To/Date block, HTML body with embedded images) — written straight into desktop OneNote via COM when it's installed (no sign-in), or via the Microsoft Graph OneNote API otherwise.
 
 This file is the orientation for AI coding agents. Detailed knowledge lives in `agents/`.
 
@@ -12,6 +12,7 @@ This file is the orientation for AI coding agents. Detailed knowledge lives in `
 | `dotnet test` | Run unit tests (synthetic fixtures only; no network, no sign-in) |
 | `dotnet run --project src/SendToOneNote` | Run the tray app |
 | `STN_INTEGRATION=1 dotnet test --filter IntegrationSmokeTests` | Real Graph API smoke test (owner's machine only; needs sign-in + a "SendToOneNote Test" section) |
+| `STN_INTEGRATION=1 dotnet test --filter DesktopIntegrationSmokeTests` | Real desktop OneNote smoke test (owner's machine only; needs desktop OneNote + a "SendToOneNote Test" section) |
 
 No local infrastructure required for unit tests. The real Graph API is touched only by the gated integration test and manual E2E.
 
@@ -20,7 +21,7 @@ No local infrastructure required for unit tests. The real Graph API is touched o
 Detailed docs in `agents/`:
 
 ### Knowledge
-- [architecture.md](agents/knowledge/architecture.md) — Repo layout, the three projects, the save pipeline (watcher → parser → builder → resolver → planner → Graph client), Graph API constraints, app-data locations.
+- [architecture.md](agents/knowledge/architecture.md) — Repo layout, the three projects, the save pipeline (watcher → parser → builder → resolver → backend seam), the desktop/Graph backends, Graph API constraints, app-data locations.
 - [background.md](agents/knowledge/background.md) — Why this app exists: the new-Outlook add-in gap, the Gmail restriction, why capture is a watched folder, verified research findings with dates.
 
 ### Rules
@@ -34,6 +35,7 @@ Detailed docs in `agents/`:
 - **System.Drawing.Common is deliberate** (Windows-only desktop app is its supported scenario; isolated behind `ImageShrinker`). Don't propose SkiaSharp/ImageSharp migrations without a reason.
 - **Graph OneNote API hard limits:** ≤4 MB per request (3.5 MB safety cap in `PagePlanner`) — the binding constraint; up to 30 binary parts per request (docs claim ~6, live service verified higher); aggressive XHTML sanitization. These shape the page-creation design; don't "simplify" them away.
 - **Delegated scopes exactly:** `User.Read`, `Notes.ReadWrite`. Authority `https://login.microsoftonline.com/common`. Never request broader scopes.
+- **`Backend` setting** (`auto`|`desktop`|`graph`, default `auto`): `auto` uses desktop OneNote via COM when `DesktopOneNoteProbe.IsAvailable()` succeeds, else falls back to Graph; `desktop`/`graph` force one path. Desktop mode never signs in and never talks to Graph — see `agents/knowledge/architecture.md`'s Backends section.
 
 ## Planning & Scope Rules
 

@@ -43,22 +43,51 @@ public class PagePlannerTests
     [Fact]
     public void LargerImagesWinWhenOverCap()
     {
-        // 31 images: index 5 is huge, everything else tiny — the huge one must survive.
-        var images = Enumerable.Range(0, 31).Select(i => Img(i, i == 5 ? 800 : 10, i == 5 ? 600 : 10)).ToList();
+        // 31 images: img30 (LAST in document order) is huge, everything else tiny.
+        // Ranking: img30 (480000) > img0..img2 (100x4 boost=400) > img3..img29 (100).
+        // 30 selected by rank leaves img29 (last of the equal-score tail, by stable
+        // sort) as the one dropped. Without ranking, img30 itself would be dropped
+        // (it's last in document order and the cap is hit before reaching it).
+        var images = Enumerable.Range(0, 31).Select(i => Img(i, i == 30 ? 800 : 10, i == 30 ? 600 : 10)).ToList();
         var plan = PagePlanner.Plan(XhtmlWith(31), images);
-        Assert.Contains(plan.Parts, p => p.Name == "img5");
-        Assert.Single(plan.DroppedPartNames);
+        Assert.Contains(plan.Parts, p => p.Name == "img30");
+        Assert.Equal(["img29"], plan.DroppedPartNames);
     }
 
     [Fact]
     public void EarlyImagesGetABoost()
     {
-        // 31 equal-size images: the first three (logo/banner position) must never be the ones dropped.
-        var images = Enumerable.Range(0, 31).Select(i => Img(i, 50, 50)).ToList();
+        // 31 images: img0..img2 are small (score 100, boosted x4 = 400); img3..img30
+        // are bigger (score 225, unboosted). With the boost, img0..2 outrank the 225s
+        // and img30 (last, unboosted) is the one dropped. Without the boost, img0
+        // (lowest score, first among ties) would be dropped instead.
+        var images = Enumerable.Range(0, 31).Select(i => Img(i, i < 3 ? 10 : 15, i < 3 ? 10 : 15)).ToList();
         var plan = PagePlanner.Plan(XhtmlWith(31), images);
-        Assert.DoesNotContain("img0", plan.DroppedPartNames);
-        Assert.DoesNotContain("img1", plan.DroppedPartNames);
-        Assert.DoesNotContain("img2", plan.DroppedPartNames);
+        Assert.Equal(["img30"], plan.DroppedPartNames);
+    }
+
+    [Fact]
+    public void SmallerImageStillFitsWhenLargerOneBlowsTheBudget()
+    {
+        // img0 and img1 are undecodable 1.75 MB blobs (Score falls back to
+        // Data.Length; the shrinker's threshold is MaxRequestBytes/2 = 1.75 MB, so
+        // ShrinkIfNeeded passes them through unchanged). img2 is a tiny real PNG.
+        // All three are within the first-3 boost, so ranking is img0/img1 (score
+        // ~7,000,000) ahead of img2 (score 10,000) — img0 is selected first, then
+        // img1 no longer fits the remaining byte budget and must be SKIPPED (not
+        // break out of the loop), so img2 — ranked last but small enough — still
+        // gets a chance to fit. With `break` instead of `continue`, img2 would also
+        // be dropped once img1 fails to fit.
+        var images = new List<ResolvedImage>
+        {
+            new("img0", "image/png", new byte[1_750_000]),
+            new("img1", "image/png", new byte[1_750_000]),
+            Img(2, 50, 50),
+        };
+        var plan = PagePlanner.Plan(XhtmlWith(3), images);
+        Assert.Equal(["img0", "img2"], plan.Parts.Select(p => p.Name));
+        Assert.Equal(["img1"], plan.DroppedPartNames);
+        Assert.DoesNotContain("name:img1", plan.PresentationXhtml);
     }
 
     [Fact]

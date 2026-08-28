@@ -5,6 +5,8 @@ using System.Windows.Media;
 using H.NotifyIcon;
 using H.NotifyIcon.Core;
 using SendToOneNote.Core.Auth;
+using SendToOneNote.Core.Backends;
+using SendToOneNote.Core.Desktop;
 using SendToOneNote.Core.OneNote;
 using SendToOneNote.Core.Storage;
 using SendToOneNote.Core.Watch;
@@ -16,9 +18,12 @@ public sealed class TrayContext : IDisposable
 {
     private readonly JsonFileStore _store = new();
     private readonly FileLog _log;
+    private readonly StaComWorker _comWorker = new();
     private TaskbarIcon? _icon;
     private DropFolderWatcher? _watcher;
+    // Null in desktop-OneNote mode — nothing to sign in to, so no "Sign in again" menu item.
     private MsalTokenProvider? _tokens;
+    private IOneNoteBackend? _backend;
     private SavePipeline? _pipeline;
     private string? _lastUrl;
 
@@ -27,18 +32,41 @@ public sealed class TrayContext : IDisposable
     public void Run()
     {
         var settings = _store.LoadSettings();
-        _tokens = new MsalTokenProvider(_store.RootDir, settings.ClientIdOverride);
+        BackendChoice choice;
+        try
+        {
+            choice = BackendSelector.Choose(settings.Backend,
+                () => _comWorker.RunAsync(() => DesktopOneNoteProbe.IsAvailable()).GetAwaiter().GetResult());
+        }
+        catch (InvalidOperationException ex)
+        {
+            MessageBox.Show(ex.Message, "SendToOneNote");
+            Application.Current.Shutdown();
+            return;
+        }
+        _log.Info($"Backend: {choice.Kind} — {choice.Reason}");
+
+        ITokenProvider? tokens = null;
+        if (choice.Kind == BackendKind.Desktop)
+        {
+            _backend = new DesktopOneNoteBackend(_comWorker);
+        }
+        else
+        {
+            _tokens = new MsalTokenProvider(_store.RootDir, settings.ClientIdOverride);
+            tokens = _tokens;
+            _backend = new GraphBackend(new OneNoteClient(_tokens));
+        }
 
         if (settings.DropFolder is null)
         {
-            var first = new FirstRunWindow(_tokens, settings);
+            var first = new FirstRunWindow(tokens, settings);
             first.ShowDialog();
             if (!first.Completed) { Application.Current.Shutdown(); return; }
             _store.SaveSettings(settings);
         }
 
-        var client = new OneNoteClient(_tokens);
-        _pipeline = new SavePipeline(_store, client, _log);
+        _pipeline = new SavePipeline(_store, _backend, _log);
         _pipeline.Saved += (msg, url) => Notify("SendToOneNote", msg, url, NotificationIcon.Info);
         _pipeline.Failed += msg => Notify("SendToOneNote — failed", msg, null, NotificationIcon.Error);
 
@@ -50,7 +78,9 @@ public sealed class TrayContext : IDisposable
 
         _icon = new TaskbarIcon
         {
-            ToolTipText = "SendToOneNote",
+            ToolTipText = choice.Kind == BackendKind.Desktop
+                ? "SendToOneNote — desktop OneNote"
+                : "SendToOneNote — cloud (Graph)",
             IconSource = new GeneratedIconSource
             {
                 Text = "N",
@@ -71,15 +101,18 @@ public sealed class TrayContext : IDisposable
         var menu = new System.Windows.Controls.ContextMenu();
         AddItem(menu, "Open drop folder", () =>
             Process.Start(new ProcessStartInfo("explorer.exe", $"\"{settings.DropFolder}\"") { UseShellExecute = true }));
-        AddItem(menu, "Sign in again", async () =>
+        if (_tokens is { } signIn)
         {
-            try { await _tokens.GetAccessTokenAsync(interactiveAllowed: true); }
-            catch (Exception ex)
+            AddItem(menu, "Sign in again", async () =>
             {
-                _log.Error("Interactive sign-in failed", ex);
-                Notify("SendToOneNote — sign-in failed", ex.Message, null);
-            }
-        });
+                try { await signIn.GetAccessTokenAsync(interactiveAllowed: true); }
+                catch (Exception ex)
+                {
+                    _log.Error("Interactive sign-in failed", ex);
+                    Notify("SendToOneNote — sign-in failed", ex.Message, null);
+                }
+            });
+        }
         AddItem(menu, "Exit", () => Application.Current.Shutdown());
         _icon.ContextMenu = menu;
         // Creates the native notification-area icon. Without this the icon never
@@ -114,6 +147,7 @@ public sealed class TrayContext : IDisposable
     {
         _icon?.Dispose();
         _watcher?.Dispose();
+        _comWorker.Dispose();
         _tokens = null;
     }
 

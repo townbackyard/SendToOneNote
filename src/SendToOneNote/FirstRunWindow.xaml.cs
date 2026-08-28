@@ -8,15 +8,21 @@ namespace SendToOneNote;
 
 public partial class FirstRunWindow : Window
 {
-    private readonly ITokenProvider _tokens;
+    // Null in desktop-OneNote mode: saving is local, so there is nothing to sign in to.
+    private readonly ITokenProvider? _tokens;
     private readonly AppSettings _settings;
     public bool Completed { get; private set; }
 
-    public FirstRunWindow(ITokenProvider tokens, AppSettings settings)
+    public FirstRunWindow(ITokenProvider? tokens, AppSettings settings)
     {
         InitializeComponent();
         _tokens = tokens;
         _settings = settings;
+        if (_tokens is null)
+        {
+            SignInPanel.Visibility = Visibility.Collapsed;
+            IntroText.Text = "Saving to your desktop OneNote — no sign-in needed. Choose the folder you'll drag emails into.";
+        }
         FolderBox.Text = settings.DropFolder ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
             "SendToOneNote Drop");
@@ -24,6 +30,7 @@ public partial class FirstRunWindow : Window
 
     private async void SignIn_Click(object sender, RoutedEventArgs e)
     {
+        if (_tokens is null) return;
         SignInBtn.IsEnabled = false;
         try
         {
@@ -45,7 +52,7 @@ public partial class FirstRunWindow : Window
 
     private void Finish_Click(object sender, RoutedEventArgs e)
     {
-        if (_tokens.SignedInUser is null)
+        if (_tokens is not null && _tokens.SignedInUser is null)
         {
             MessageBox.Show(this, "Please sign in first.", "SendToOneNote");
             return;

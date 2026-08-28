@@ -4,11 +4,13 @@
         Title="SendToOneNote setup" Width="460" Height="300"
         WindowStartupLocation="CenterScreen">
     <StackPanel Margin="16">
-        <TextBlock TextWrapping="Wrap" Margin="0,0,0,12"
+        <TextBlock x:Name="IntroText" TextWrapping="Wrap" Margin="0,0,0,12"
                    Text="Sign in with the Microsoft account whose OneDrive holds your OneNote notebooks, then choose the folder you'll drag emails into."/>
-        <Button x:Name="SignInBtn" Content="Sign in to Microsoft" Click="SignIn_Click"
-                Width="200" HorizontalAlignment="Left"/>
-        <TextBlock x:Name="SignedInAs" Margin="0,6,0,12" Foreground="Gray"/>
+        <StackPanel x:Name="SignInPanel">
+            <Button x:Name="SignInBtn" Content="Sign in to Microsoft" Click="SignIn_Click"
+                    Width="200" HorizontalAlignment="Left"/>
+            <TextBlock x:Name="SignedInAs" Margin="0,6,0,12" Foreground="Gray"/>
+        </StackPanel>
         <DockPanel Margin="0,0,0,12">
             <Button DockPanel.Dock="Right" Content="Browse…" Click="Browse_Click" Width="80"/>
             <TextBox x:Name="FolderBox" Margin="0,0,8,0"/>

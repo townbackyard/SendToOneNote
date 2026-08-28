@@ -2,6 +2,7 @@ using System.IO;
 using System.Net.Http;
 using System.Windows;
 using SendToOneNote.Core.Auth;
+using SendToOneNote.Core.Backends;
 using SendToOneNote.Core.Email;
 using SendToOneNote.Core.OneNote;
 using SendToOneNote.Core.Pages;
@@ -12,7 +13,7 @@ using SendToOneNote.Logging;
 namespace SendToOneNote;
 
 public sealed class SavePipeline(
-    JsonFileStore store, OneNoteClient client, FileLog log)
+    JsonFileStore store, IOneNoteBackend backend, FileLog log)
 {
     // One HttpClient-backed resolver reused across emails — avoids the
     // HttpClient-per-call anti-pattern of constructing a new ImageResolver per email.
@@ -41,21 +42,24 @@ public sealed class SavePipeline(
             await using (var s = File.OpenRead(path))
                 email = EmlParser.Parse(s);
 
-            var tree = store.LoadTreeCache();
-            if (tree is null)
+            NotebookTree tree;
+            if (backend.Name == "desktop")
             {
-                tree = await RefreshTreeAsync();
+                tree = await backend.GetTreeAsync();            // ~100 ms local; always fresh
             }
             else
             {
-                // Background refresh for next time — logged instead of silently swallowed.
-                _ = RefreshTreeAsync().ContinueWith(t =>
-                    log.Error("Background notebook refresh failed", t.Exception),
-                    TaskContinuationOptions.OnlyOnFaulted);
+                var cached = store.LoadTreeCache();
+                tree = cached ?? await RefreshTreeAsync();
+                if (cached is not null)                        // cache hit: refresh for next time
+                    _ = RefreshTreeAsync().ContinueWith(t =>
+                        log.Error("Background notebook refresh failed", t.Exception),
+                        TaskContinuationOptions.OnlyOnFaulted);
             }
 
             var settings = store.LoadSettings();
-            var vm = new SectionPickerViewModel(tree, settings.RecentSectionIds);
+            var recents = backend.Name == "desktop" ? settings.RecentDesktopSectionIds : settings.RecentSectionIds;
+            var vm = new SectionPickerViewModel(tree, recents);
 
             PickerItem? pick = null;
             await Application.Current.Dispatcher.InvokeAsync(() =>
@@ -66,12 +70,28 @@ public sealed class SavePipeline(
             if (pick is null) { log.Info($"Cancelled: {path}"); return; }
 
             var xhtml = PageXhtmlBuilder.Build(email);
-            var (normalized, images) = await _images.ResolveAsync(xhtml, email.InlineImages);
-            var plan = PagePlanner.Plan(normalized, images);
-            var page = await client.CreatePageAsync(pick.SectionId, plan);
+            var resolution = await _images.ResolveWithReportAsync(xhtml, email.InlineImages);
+            var page = await backend.CreatePageAsync(pick.SectionId, resolution.Xhtml, resolution.Images);
+            if (settings.ImageDiagnostics)
+            {
+                try
+                {
+                    // Only the Graph path can drop images (the 3.5 MB request cap);
+                    // the desktop backend embeds every part.
+                    IReadOnlyList<string> droppedMinor = backend.Name == "graph"
+                        ? PagePlanner.Plan(resolution.Xhtml, resolution.Images).DroppedPartNames
+                        : [];
+                    var folder = ImageDiagnosticsWriter.Write(Path.GetDirectoryName(path)!,
+                        Path.GetFileNameWithoutExtension(path), resolution.Decisions, resolution.Images, droppedMinor, DateTime.Now);
+                    log.Info($"Image diagnostics written to {folder}");
+                }
+                catch (Exception diagEx) { log.Error("Image diagnostics failed (save was fine)", diagEx); }
+            }
 
-            settings.RecentSectionIds =
-                SectionPickerViewModel.PushRecent(settings.RecentSectionIds, pick.SectionId);
+            if (backend.Name == "desktop")
+                settings.RecentDesktopSectionIds = SectionPickerViewModel.PushRecent(recents, pick.SectionId);
+            else
+                settings.RecentSectionIds = SectionPickerViewModel.PushRecent(recents, pick.SectionId);
             store.SaveSettings(settings);
 
             if (settings.DeleteOnSuccess) File.Delete(path);
@@ -90,6 +110,7 @@ public sealed class SavePipeline(
                 AuthRequiredException => "Sign-in required — open SendToOneNote from the tray.",
                 OneNoteApiException o => $"OneNote API error {o.StatusCode}.",
                 HttpRequestException => "You appear to be offline. The email was moved to the Failed folder — drag it back into the drop folder to retry.",
+                DesktopOneNoteException d => $"Desktop OneNote: {d.Message}",
                 _ => "Unexpected error — see log."
             };
             MoveToFailed(path, reason, ex);
@@ -104,7 +125,7 @@ public sealed class SavePipeline(
 
     private async Task<NotebookTree> RefreshTreeAsync()
     {
-        var tree = await client.GetNotebookTreeAsync();
+        var tree = await backend.GetTreeAsync();
         store.SaveTreeCache(tree);
         return tree;
     }

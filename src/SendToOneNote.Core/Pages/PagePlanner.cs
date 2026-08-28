@@ -1,5 +1,4 @@
 using System.Text;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace SendToOneNote.Core.Pages;
@@ -7,95 +6,81 @@ namespace SendToOneNote.Core.Pages;
 public sealed record OneNoteRequestPart(string Name, string ContentType, byte[] Data);
 public sealed record AppendPlan(string CommandsJson, IReadOnlyList<OneNoteRequestPart> Parts);
 public sealed record PagePlan(string PresentationXhtml, IReadOnlyList<OneNoteRequestPart> Parts,
-    IReadOnlyList<AppendPlan> Appends);
+    IReadOnlyList<AppendPlan> Appends)
+{
+    public IReadOnlyList<string> DroppedPartNames { get; init; } = [];
+}
 
 public static class PagePlanner
 {
     public const int MaxRequestBytes = 3_500_000;
-    // Microsoft documents ~6 multipart sections per POST, but the live service
-    // accepted 20 binary parts in one request (verified 2026-08-21). 30 matches
-    // the API's documented images-per-POST figure; the 4 MB byte cap is the real
-    // binding constraint. Most emails therefore save in ONE request — the
-    // slot/append fallback below only triggers past these caps.
     public const int MaxBinaryPartsPerRequest = 30;
+    private const int EarlyImageCount = 3;   // logo/banner slots get a ranking boost
+    private const int EarlyImageBoost = 4;
 
-    // Matches the whole <img .../> element for a given part name regardless of other
-    // attributes or their order (AngleSharp's XHTML serializer may emit alt/width/style/etc.
-    // alongside src, and attribute order is not guaranteed).
     private static Regex ImgTagRegex(string partName) =>
         new($"<img\\b[^>]*src=\"name:{Regex.Escape(partName)}\"[^>]*/>");
 
+    /// <summary>
+    /// Graph path only: everything fits in ONE request or is dropped. Images are ranked by
+    /// rendered area (early ones boosted); the desktop backend never calls this.
+    /// </summary>
     public static PagePlan Plan(string xhtml, IReadOnlyList<ResolvedImage> images)
     {
-        // Shrink anything that alone would blow the cap.
+        var dropped = new List<string>();
+
         var shrunk = images.Select(i =>
         {
             var (data, ct) = ImageShrinker.ShrinkIfNeeded(i.Data, i.ContentType, MaxRequestBytes / 2);
-            return new ResolvedImage(i.PartName, ct, data);
+            return i with { Data = data, ContentType = ct };
         }).ToList();
 
-        // Drop anything STILL over the cap (undecodable blobs the shrinker passed through):
-        // a part that can never fit would 413 the request it rides on.
         var kept = new List<ResolvedImage>();
         foreach (var img in shrunk)
         {
             if (img.Data.Length > MaxRequestBytes - 4096)
-                xhtml = ImgTagRegex(img.PartName).Replace(xhtml,
-                    "<p style=\"color:#999999\">[image omitted: too large]</p>");
+            {
+                xhtml = ImgTagRegex(img.PartName).Replace(xhtml, "<p style=\"color:#999999\">[image omitted: too large]</p>");
+                dropped.Add(img.PartName);
+            }
             else kept.Add(img);
         }
 
-        // Greedy first batch for the create request.
-        var firstBatch = new List<ResolvedImage>();
+        var ranked = kept
+            .Select((img, docIndex) => (img, score: Score(img) * (docIndex < EarlyImageCount ? EarlyImageBoost : 1)))
+            .OrderByDescending(x => x.score)
+            .Select(x => x.img)
+            .ToList();
+
+        var selected = new HashSet<string>();
         long budget = MaxRequestBytes - Encoding.UTF8.GetByteCount(xhtml) - 4096;
-        foreach (var img in kept)
+        foreach (var img in ranked)
         {
-            if (firstBatch.Count >= MaxBinaryPartsPerRequest || img.Data.Length > budget) break;
-            firstBatch.Add(img);
+            if (selected.Count >= MaxBinaryPartsPerRequest || img.Data.Length > budget) continue;
+            selected.Add(img.PartName);
             budget -= img.Data.Length;
         }
 
-        var overflow = kept.Skip(firstBatch.Count).ToList();
-        var presentation = xhtml;
-        foreach (var img in overflow)
-            // &#160; placeholder: OneNote's importer prunes EMPTY elements even
-            // with a data-id, which makes the later PATCH fail with 20149
-            // "target not found". A nbsp keeps the slot alive.
-            presentation = ImgTagRegex(img.PartName).Replace(presentation,
-                $"<div data-id=\"slot-{img.PartName}\">&#160;</div>");
-
-        var appends = new List<AppendPlan>();
-        var batch = new List<ResolvedImage>();
-        long batchBytes = 0;
-        foreach (var img in overflow)
+        foreach (var img in kept.Where(i => !selected.Contains(i.PartName)))
         {
-            if (batch.Count >= MaxBinaryPartsPerRequest ||
-                batchBytes + img.Data.Length > MaxRequestBytes - 4096)
-            {
-                if (batch.Count > 0) appends.Add(ToAppend(batch));
-                batch = []; batchBytes = 0;
-            }
-            batch.Add(img);
-            batchBytes += img.Data.Length;
+            xhtml = ImgTagRegex(img.PartName).Replace(xhtml, "");
+            dropped.Add(img.PartName);
         }
-        if (batch.Count > 0) appends.Add(ToAppend(batch));
 
-        return new PagePlan(presentation,
-            firstBatch.Select(i => new OneNoteRequestPart(i.PartName, i.ContentType, i.Data)).ToList(),
-            appends);
+        var parts = kept.Where(i => selected.Contains(i.PartName))   // document order for stability
+            .Select(i => new OneNoteRequestPart(i.PartName, i.ContentType, i.Data)).ToList();
+        return new PagePlan(xhtml, parts, []) { DroppedPartNames = dropped };
     }
 
-    private static AppendPlan ToAppend(List<ResolvedImage> batch)
+    private static long Score(ResolvedImage img)
     {
-        // Graph rejects "replace" on a div target (20141); divs support
-        // append/prepend, so the image is appended INTO the slot div.
-        var commands = batch.Select(i => new
+        if (img.Width > 0 && img.Height > 0) return (long)img.Width * img.Height;
+        try
         {
-            target = $"#slot-{i.PartName}",
-            action = "append",
-            content = $"<img src=\"name:{i.PartName}\"/>"
-        });
-        return new AppendPlan(JsonSerializer.Serialize(commands),
-            batch.Select(i => new OneNoteRequestPart(i.PartName, i.ContentType, i.Data)).ToList());
+            using var ms = new MemoryStream(img.Data);
+            using var image = System.Drawing.Image.FromStream(ms, false, false);
+            return (long)image.Width * image.Height;
+        }
+        catch (Exception) { return img.Data.Length; }
     }
 }

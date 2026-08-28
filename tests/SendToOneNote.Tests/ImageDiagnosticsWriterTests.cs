@@ -39,4 +39,17 @@ public class ImageDiagnosticsWriterTests : IDisposable
         Assert.True(Directory.Exists(folder));
         Assert.DoesNotContain("/", Path.GetFileName(folder));
     }
+
+    [Fact]
+    public void FailingImageWriteLeavesNoCsvBehind()
+    {
+        var decisions = new List<ImageDecision> { new(0, "http://x.example/img", "img0<bad", 1, 1, 1, "", "remote", "embedded", "ok") };
+        var images = new List<ResolvedImage> { new("img0<bad", "image/png", [1], 1, 1) };
+        var now = new DateTime(2026, 1, 1);
+
+        Assert.Throws<IOException>(() => ImageDiagnosticsWriter.Write(_dir, "test", decisions, images, [], now));
+        var folder = Path.Combine(_dir, "Diagnostics", $"test-{now:yyyyMMdd-HHmmss}");
+        Assert.True(Directory.Exists(folder));
+        Assert.False(File.Exists(Path.Combine(folder, "images.csv")));
+    }
 }

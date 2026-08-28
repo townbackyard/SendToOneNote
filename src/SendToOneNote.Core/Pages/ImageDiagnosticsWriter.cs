@@ -22,10 +22,12 @@ public static class ImageDiagnosticsWriter
                 Q(d.Alt), d.Source, decision, Q(d.Reason)
             })).Append('\n');
         }
-        File.WriteAllText(Path.Combine(folder, "images.csv"), sb.ToString(), Encoding.UTF8);
 
+        // Write images first; CSV last so a folder with no CSV means "incomplete dump".
         foreach (var img in images)
             File.WriteAllBytes(Path.Combine(folder, $"{img.PartName}.{Ext(img.ContentType)}"), img.Data);
+
+        File.WriteAllText(Path.Combine(folder, "images.csv"), sb.ToString(), Encoding.UTF8);
 
         return folder;
     }

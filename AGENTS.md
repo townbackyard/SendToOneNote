@@ -39,7 +39,8 @@ Detailed docs in `agents/`:
 
 ## Planning & Scope Rules
 
-- Spec: `docs/superpowers/specs/2026-08-21-sendtoonenote-design.md`. Plan: `docs/superpowers/plans/2026-08-21-sendtoonenote-v1.md`. GitHub issues #1–#13 map 1:1 to plan tasks; #16–#20 are v2 backlog.
+- v1 spec: `docs/superpowers/specs/2026-08-21-sendtoonenote-design.md`. v1 plan: `docs/superpowers/plans/2026-08-21-sendtoonenote-v1.md`. GitHub issues #1–#13 map 1:1 to v1 plan tasks; #16–#20 are v2 backlog.
+- v1.1 spec: `docs/superpowers/specs/2026-08-28-desktop-onenote-backend-design.md`. v1.1 plan: `docs/superpowers/plans/2026-08-28-desktop-onenote-backend.md`. GitHub issues #21–#30 map 1:1 to its Tasks 1–10 (#31 is the owner's manual steps).
 - **The active plan defines scope.** v2 candidates (attachments option, auto-send mode, .txt/image drops, right-click handler) are explicitly out of v1 — don't implement them incidentally.
 - If you discover related work that *could* be done but isn't in the plan, surface it as an **Open Question** — never fold it into a task silently.
 

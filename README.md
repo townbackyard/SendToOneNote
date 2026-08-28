@@ -47,8 +47,10 @@ Your email content goes from the local .eml file directly to Microsoft Graph
 under your own sign-in. Nothing is sent anywhere else. No telemetry.
 
 With desktop OneNote, nothing is sent anywhere by this app; OneNote's own
-sync is the only network activity. Tracking pixels in emails are stripped
-before saving, so senders don't get a read receipt from your machine.
+sync is the only network activity.
+
+On both paths, tracking pixels in emails are stripped before saving, so
+senders don't get a read receipt from your machine.
 
 ## Fidelity notes
 

@@ -47,4 +47,30 @@ public class StorageTests : IDisposable
         Assert.NotNull(loaded);
         Assert.Equal("Taxes 2026", loaded!.Notebooks[0].Groups[0].Sections[0].Name);
     }
+
+    [Fact]
+    public void NewSettingsHaveSafeDefaultsAndRoundTrip()
+    {
+        var store = new JsonFileStore(_dir);
+        var s = store.LoadSettings();
+        Assert.Equal("auto", s.Backend);
+        Assert.False(s.ImageDiagnostics);
+        Assert.Empty(s.RecentDesktopSectionIds);
+        s.Backend = "graph"; s.ImageDiagnostics = true; s.RecentDesktopSectionIds.Add("{S1}");
+        store.SaveSettings(s);
+        var s2 = new JsonFileStore(_dir).LoadSettings();
+        Assert.Equal("graph", s2.Backend);
+        Assert.True(s2.ImageDiagnostics);
+        Assert.Equal(["{S1}"], s2.RecentDesktopSectionIds);
+    }
+
+    [Fact]
+    public void OldSettingsFileWithoutNewKeysStillLoads()
+    {
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(Path.Combine(_dir, "settings.json"), """{"DropFolder":"C:\\Drop","DeleteOnSuccess":true,"RecentSectionIds":["a"]}""");
+        var s = new JsonFileStore(_dir).LoadSettings();
+        Assert.Equal("auto", s.Backend);
+        Assert.Equal(["a"], s.RecentSectionIds);
+    }
 }

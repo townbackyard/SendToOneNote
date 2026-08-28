@@ -18,6 +18,10 @@ public static class PagePlanner
     private const int EarlyImageCount = 3;   // logo/banner slots get a ranking boost
     private const int EarlyImageBoost = 4;
 
+    // Must match the whole <img …/> element regardless of other attributes or their order —
+    // AngleSharp's XHTML serializer may emit alt/width/style alongside src, and attribute
+    // order isn't guaranteed. A miss here leaves a "name:imgN" reference in the XHTML with
+    // no matching binary part in the request.
     private static Regex ImgTagRegex(string partName) =>
         new($"<img\\b[^>]*src=\"name:{Regex.Escape(partName)}\"[^>]*/>");
 
@@ -75,12 +79,7 @@ public static class PagePlanner
     private static long Score(ResolvedImage img)
     {
         if (img.Width > 0 && img.Height > 0) return (long)img.Width * img.Height;
-        try
-        {
-            using var ms = new MemoryStream(img.Data);
-            using var image = System.Drawing.Image.FromStream(ms, false, false);
-            return (long)image.Width * image.Height;
-        }
-        catch (Exception) { return img.Data.Length; }
+        var (w, h) = ImageShrinker.TryReadDimensions(img.Data);
+        return w > 0 && h > 0 ? (long)w * h : img.Data.Length;
     }
 }

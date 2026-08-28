@@ -75,7 +75,7 @@ public sealed class ImageResolver
             if (data is null || contentType is null)
                 return (img, null, null, new ImageDecision(index, src, null, 0, 0, 0, alt, source, "left-as-url", "not downloadable / no matching cid"));
 
-            var (w, h) = Dimensions(data);
+            var (w, h) = ImageShrinker.TryReadDimensions(data);
             if (w > 0 && w <= 2 && h <= 2)
                 return (img, null, null, Junk(index, src, alt, source, $"decoded size {w}x{h}"));
 
@@ -102,15 +102,4 @@ public sealed class ImageResolver
         new(index, src, null, 0, 0, 0, alt, source, "dropped-junk", reason);
 
     private static bool TryInt(string? s, out int v) => int.TryParse(s?.Trim().TrimEnd('p', 'x'), out v);
-
-    private static (int W, int H) Dimensions(byte[] data)
-    {
-        try
-        {
-            using var ms = new MemoryStream(data);
-            using var image = System.Drawing.Image.FromStream(ms, useEmbeddedColorManagement: false, validateImageData: false);
-            return (image.Width, image.Height);
-        }
-        catch (Exception) { return (0, 0); }
-    }
 }

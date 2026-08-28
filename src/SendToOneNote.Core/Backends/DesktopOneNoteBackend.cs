@@ -76,11 +76,20 @@ public sealed class DesktopOneNoteBackend : IOneNoteBackend
         }
     }
 
+    // RPC/connection-class HRESULTs a dead out-of-proc server most commonly returns
+    // when OneNote.exe is killed, crashes, or is restarted by an Office update.
+    // E_UNEXPECTED (0x8000FFFF) is not strictly RPC-class but is included anyway
+    // because re-activating the RCW is cheap (~5 ms) if it turns out to be a false positive.
     private static bool IsConnectionLost(uint hresult) => hresult is
         0x80010108 // RPC_E_DISCONNECTED
         or 0x800401FD // CO_E_OBJNOTCONNECTED
         or 0x8001010E // RPC_E_WRONG_THREAD
-        or 0x8000FFFF; // E_UNEXPECTED
+        or 0x8000FFFF // E_UNEXPECTED
+        or 0x800706BA // HRESULT_FROM_WIN32(RPC_S_SERVER_UNAVAILABLE)
+        or 0x800706BE // HRESULT_FROM_WIN32(RPC_S_CALL_FAILED)
+        or 0x80010105 // RPC_E_SERVERFAULT
+        or 0x80010007 // RPC_E_SERVER_DIED
+        or 0x80010012; // RPC_E_SERVER_DIED_DNE
 
     private void DropApp()
     {

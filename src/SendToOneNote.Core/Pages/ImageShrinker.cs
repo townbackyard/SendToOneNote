@@ -5,6 +5,23 @@ namespace SendToOneNote.Core.Pages;
 
 public static class ImageShrinker
 {
+    /// <summary>Decodes an image just far enough to read its pixel dimensions. Returns
+    /// (0, 0) when the data isn't a decodable image (the caller falls back to another
+    /// measure, e.g. byte length).</summary>
+    public static (int Width, int Height) TryReadDimensions(byte[] data)
+    {
+        try
+        {
+            using var ms = new MemoryStream(data);
+            using var image = Image.FromStream(ms, useEmbeddedColorManagement: false, validateImageData: false);
+            return (image.Width, image.Height);
+        }
+        catch (Exception)
+        {
+            return (0, 0);
+        }
+    }
+
     public static (byte[] Data, string ContentType) ShrinkIfNeeded(
         byte[] data, string contentType, int maxBytes)
     {

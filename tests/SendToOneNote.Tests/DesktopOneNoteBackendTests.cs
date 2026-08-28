@@ -64,11 +64,13 @@ public class DesktopOneNoteBackendTests
         Assert.Contains("read-only", ex.Message);
     }
 
-    [Fact]
-    public async Task ReactivatesAfterRpcDisconnection()
+    [Theory]
+    [InlineData(unchecked((int)0x80010108))] // RPC_E_DISCONNECTED
+    [InlineData(unchecked((int)0x800706BA))] // HRESULT_FROM_WIN32(RPC_S_SERVER_UNAVAILABLE)
+    public async Task ReactivatesAfterRpcDisconnection(int hresult)
     {
         using var w = new StaComWorker();
-        var fake = new FakeOneNoteApplication { ThrowOnUpdate = new COMException("gone", unchecked((int)0x80010108)) };
+        var fake = new FakeOneNoteApplication { ThrowOnUpdate = new COMException("gone", hresult) };
         var factoryCalls = 0;
         var backend = new DesktopOneNoteBackend(w, () => { factoryCalls++; return fake; });
 

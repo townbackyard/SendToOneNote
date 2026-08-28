@@ -80,6 +80,7 @@ public class ImageResolverTests
         var d = Assert.Single(r.Decisions);
         Assert.Equal("dropped-junk", d.Decision);
         Assert.Contains("tracking", d.Reason);
+        Assert.Empty(stub.Requests);
     }
 
     [Fact]

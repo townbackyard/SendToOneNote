@@ -48,7 +48,7 @@ public interface IOneNoteBackend
 
 ### Backend selection
 
-`BackendSelector.Choose(settings)`: `settings.Backend` = `auto` (default) | `desktop` | `graph`. `auto` → desktop if `Type.GetTypeFromProgID("OneNote.Application")` resolves AND the QueryInterface for `IApplication` succeeds, else Graph. Selection is logged and shown in the tray tooltip ("SendToOneNote — desktop OneNote" / "— cloud (Graph)").
+`BackendSelector.Choose(settings)`: `settings.Backend` = `auto` (default) | `desktop` | `graph`. **`graph` forces the cloud path even when desktop OneNote is installed** (the owner-requested escape hatch); `desktop` forces COM; `auto` → desktop if `Type.GetTypeFromProgID("OneNote.Application")` resolves AND the QueryInterface for `IApplication` succeeds, else Graph. Selection is logged and shown in the tray tooltip ("SendToOneNote — desktop OneNote" / "— cloud (Graph)").
 
 ### First-run & tray on the desktop path
 

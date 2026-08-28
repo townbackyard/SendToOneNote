@@ -14,5 +14,5 @@
 - [ ] Image-heavy newsletter saves within seconds and is visible in OneNote immediately (no "Page Not Yet Available")
 - [ ] Saved page contains no tracking pixel (check page for stray 1x1 images)
 - [ ] `"Backend": "graph"` forces the cloud path (tooltip says cloud; sign-in appears; save works)
-- [ ] `"ImageDiagnostics": true` writes Diagnostics\<email>\images.csv with sensible decisions
+- [ ] `"ImageDiagnostics": true` writes Diagnostics\<email>-<timestamp>\images.csv with sensible decisions
 - [ ] Picker shows local-only notebooks on the desktop path

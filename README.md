@@ -69,9 +69,9 @@ Remote images are downloaded and embedded so pages outlive expiring links.
   picked up automatically — start the app and drag the file out and back in
   (or re-save it).
 - `"ImageDiagnostics": true` in settings.json writes
-  `Diagnostics\<email>\images.csv` (plus the downloaded images) next to the
-  drop folder for every save, showing why each image was embedded or
-  dropped.
+  `Diagnostics\<email>-<timestamp>\images.csv` (plus the downloaded images)
+  inside the drop folder for every save, showing why each image was
+  embedded or dropped.
 - `"Backend": "desktop"` failing at startup means desktop OneNote isn't
   installed — the Store app "OneNote for Windows 10" doesn't count; you
   need the desktop Office application.

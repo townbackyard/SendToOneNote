@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using MimeKit;
 
 namespace SendToOneNote.Core.Email;
@@ -40,8 +41,16 @@ public static class EmlParser
                     ms.ToArray()));
             }
 
+            // New Outlook's drag-out stamps a Content-ID on every part, so a Content-ID
+            // alone does not make a part inline. Only an image the body references by
+            // cid: is inline (captured above); everything else the sender marked as an
+            // attachment is listed by name.
+            var referencedCids = new HashSet<string>(
+                Regex.Matches(html ?? "", @"cid:([^""'\s>)]+)", RegexOptions.IgnoreCase)
+                    .Select(m => m.Groups[1].Value.Trim('<', '>')),
+                StringComparer.OrdinalIgnoreCase);
             var attachments = msg.Attachments.OfType<MimePart>()
-                .Where(p => p.ContentId is null) // inline images already captured
+                .Where(p => !(p.ContentId is not null && referencedCids.Contains(p.ContentId.Trim('<', '>'))))
                 .Select(p => p.FileName ?? "attachment")
                 .ToList();
 

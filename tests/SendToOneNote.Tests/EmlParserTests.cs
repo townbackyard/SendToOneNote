@@ -92,4 +92,91 @@ public class EmlParserTests
         Assert.Equal(["report.pdf"], e.AttachmentNames);
         Assert.Empty(e.InlineImages);
     }
+
+    // New Outlook's drag-out stamps a Content-ID on every part, attachments included.
+    private const string TinyPng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
+    [Fact]
+    public void AttachmentWithContentIdIsStillAnAttachment()
+    {
+        var raw = """
+            From: sender@example.com
+            To: recipient@example.com
+            Subject: Renewal confirmation
+            MIME-Version: 1.0
+            Content-Type: multipart/mixed; boundary="mixed1"
+
+            --mixed1
+            Content-Type: text/html; charset="utf-8"
+            Content-ID: <BODY0001@1>
+
+            <html><body><p>Open the attached PDF.</p></body></html>
+            --mixed1
+            Content-Type: application/pdf; name="certificate.pdf"
+            Content-Disposition: attachment; filename="certificate.pdf"
+            Content-ID: <ATTACH0001@1>
+            Content-Transfer-Encoding: base64
+
+            JVBERi0xLjQKJSVFT0YK
+            --mixed1--
+            """;
+        var e = EmlParser.Parse(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(raw)));
+        Assert.Equal(["certificate.pdf"], e.AttachmentNames);
+        Assert.Empty(e.InlineImages);
+    }
+
+    [Fact]
+    public void ImageAttachmentNotReferencedByBodyIsListedAsAttachment()
+    {
+        var raw = $"""
+            From: sender@example.com
+            To: recipient@example.com
+            Subject: Photo
+            MIME-Version: 1.0
+            Content-Type: multipart/mixed; boundary="mixed1"
+
+            --mixed1
+            Content-Type: text/html; charset="utf-8"
+
+            <html><body><p>See attached photo.</p></body></html>
+            --mixed1
+            Content-Type: image/png; name="photo.png"
+            Content-Disposition: attachment; filename="photo.png"
+            Content-ID: <ATTACH0002@1>
+            Content-Transfer-Encoding: base64
+
+            {TinyPng}
+            --mixed1--
+            """;
+        var e = EmlParser.Parse(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(raw)));
+        Assert.Equal(["photo.png"], e.AttachmentNames);
+    }
+
+    [Fact]
+    public void ImageReferencedByBodyIsInlineNotAttachment()
+    {
+        var raw = $"""
+            From: sender@example.com
+            To: recipient@example.com
+            Subject: Logo
+            MIME-Version: 1.0
+            Content-Type: multipart/related; boundary="rel1"
+
+            --rel1
+            Content-Type: text/html; charset="utf-8"
+
+            <html><body><img src="cid:logo1@example"/></body></html>
+            --rel1
+            Content-Type: image/png; name="logo.png"
+            Content-Disposition: attachment; filename="logo.png"
+            Content-ID: <logo1@example>
+            Content-Transfer-Encoding: base64
+
+            {TinyPng}
+            --rel1--
+            """;
+        var e = EmlParser.Parse(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(raw)));
+        Assert.Equal("logo1@example", Assert.Single(e.InlineImages).ContentId);
+        Assert.Empty(e.AttachmentNames);
+    }
 }

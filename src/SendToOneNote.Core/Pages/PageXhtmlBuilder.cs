@@ -6,14 +6,17 @@ namespace SendToOneNote.Core.Pages;
 
 public static class PageXhtmlBuilder
 {
-    public static string Build(ParsedEmail email)
+    public static string Build(ParsedEmail email) => Build(email, AttachmentPlan.Empty);
+
+    public static string Build(ParsedEmail email, AttachmentPlan plan)
     {
         var sb = new StringBuilder();
         sb.Append("<html><head><title>")
           .Append(WebUtility.HtmlEncode(email.Subject))
           .Append("</title></head><body>");
         AppendHeaderTable(sb, email);
-        sb.Append("<div>");
+        AppendAttachments(sb, email, plan);
+        sb.Append("<hr/><div>");
         if (email.HtmlBody is not null)
             sb.Append(email.HtmlBody); // normalized to XHTML later by ImageResolver
         else
@@ -31,12 +34,24 @@ public static class PageXhtmlBuilder
         if (e.SentDate is { } d) Row(sb, "Sent", d.ToLocalTime().ToString("f"));
         if (e.AttachmentNames.Count > 0)
             Row(sb, "Attachments", string.Join("; ", e.AttachmentNames));
-        sb.Append("</table><hr/>");
+        sb.Append("</table>");
 
         static void Row(StringBuilder sb, string label, string value) =>
             sb.Append("<tr><td style=\"font-weight:bold\">").Append(label)
               .Append("</td><td>").Append(WebUtility.HtmlEncode(value))
               .Append("</td></tr>");
+    }
+
+    // Between the header table and the rule: file objects, then notes. Omitted entirely when there is
+    // nothing to say, so pre-v2 output is byte-identical.
+    private static void AppendAttachments(StringBuilder sb, ParsedEmail e, AttachmentPlan plan)
+    {
+        if (plan.Embedded.Count == 0 && plan.Omitted.Count == 0 && e.AttachedMessageNames.Count == 0) return;
+        sb.Append("<div class=\"stn-attachments\">");
+        foreach (var a in plan.Embedded) sb.Append(AttachmentMarkup.ObjectElement(a));
+        foreach (var o in plan.Omitted) sb.Append(AttachmentMarkup.OmittedNote(o.FileName, o.Bytes, o.Reason));
+        foreach (var m in e.AttachedMessageNames) sb.Append(AttachmentMarkup.AttachedMessageNote(m));
+        sb.Append("</div>");
     }
 
     private static void AppendTextBody(StringBuilder sb, string text)

@@ -56,12 +56,17 @@ public class StorageTests : IDisposable
         Assert.Equal("auto", s.Backend);
         Assert.False(s.ImageDiagnostics);
         Assert.Empty(s.RecentDesktopSectionIds);
+        Assert.True(s.IncludeAttachments);
+        Assert.Equal(26_214_400, s.MaxAttachmentBytes);
         s.Backend = "graph"; s.ImageDiagnostics = true; s.RecentDesktopSectionIds.Add("{S1}");
+        s.IncludeAttachments = false; s.MaxAttachmentBytes = 1000;
         store.SaveSettings(s);
         var s2 = new JsonFileStore(_dir).LoadSettings();
         Assert.Equal("graph", s2.Backend);
         Assert.True(s2.ImageDiagnostics);
         Assert.Equal(["{S1}"], s2.RecentDesktopSectionIds);
+        Assert.False(s2.IncludeAttachments);
+        Assert.Equal(1000, s2.MaxAttachmentBytes);
     }
 
     [Fact]

@@ -127,4 +127,18 @@ public class PageXhtmlBuilderTests
         Assert.Contains("data-attachment=\"report.pdf\"", m.Value);
         Assert.Contains("<p>body text</p>", r.Xhtml[(m.Index + m.Length)..]);
     }
+
+    [Fact]
+    public async Task ObjectRegexSurvivesXhtmlNormalizationWhenFileNameContainsAngleBracket()
+    {
+        // WebUtility.HtmlEncode escapes '>' as "&gt;" going in, but AngleSharp's XhtmlMarkupFormatter
+        // (which ImageResolver runs the page through) escapes only &, <, " in attribute values, so a
+        // decoded '>' is re-emitted raw: data-attachment="a>b.pdf". The attribute scan in ObjectRegex
+        // and StripAll must be quote-aware so that raw '>' doesn't end the match early.
+        var email = Email(html: "<p>body text</p>", attachments: ["a>b.pdf"]);
+        var plan = new AttachmentPlan([new PlannedAttachment("att1", email.Attachments[0])], []);
+        var r = await new ImageResolver().ResolveWithReportAsync(PageXhtmlBuilder.Build(email, plan), []);
+        Assert.True(AttachmentMarkup.ObjectRegex("att1").IsMatch(r.Xhtml), r.Xhtml);
+        Assert.DoesNotContain("data=\"name:att1\"", AttachmentMarkup.StripAll(r.Xhtml));
+    }
 }

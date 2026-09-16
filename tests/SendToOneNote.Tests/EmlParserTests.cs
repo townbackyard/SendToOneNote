@@ -212,6 +212,37 @@ public class EmlParserTests
     }
 
     [Fact]
+    public void ControlCharactersAreStrippedFromAttachmentFileName()
+    {
+        //  is a raw C0 control character (built via .Replace so the raw string literal below
+        // stays readable): it survives HtmlEncode/AngleSharp into the page XHTML (Graph rejects
+        // ill-formed XHTML) and survives into the OneNote page XML on the desktop path, so one odd
+        // name fails the whole save on both backends unless the parser strips it here.
+        var raw = """
+            From: sender@example.com
+            To: recipient@example.com
+            Subject: Control char in file name
+            MIME-Version: 1.0
+            Content-Type: multipart/mixed; boundary="mixed7"
+
+            --mixed7
+            Content-Type: text/plain
+
+            body
+            --mixed7
+            Content-Type: application/pdf
+            Content-Disposition: attachment; filename="report.pdf"
+            Content-Transfer-Encoding: base64
+
+            AQID
+            --mixed7--
+            """.Replace("\\u0001", "");
+        var e = EmlParser.Parse(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(raw)));
+        var a = Assert.Single(e.Attachments);
+        Assert.Equal("report.pdf", a.FileName);
+    }
+
+    [Fact]
     public void AttachmentWithoutContentTypeFallsBackToOctetStream()
     {
         var raw = """

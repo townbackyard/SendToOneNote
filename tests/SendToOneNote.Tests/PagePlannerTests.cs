@@ -191,4 +191,21 @@ public class PagePlannerTests
         Assert.Equal(["att2"], plan.Parts.Select(p => p.Name));
         Assert.Equal(["att1"], plan.DroppedPartNames);
     }
+
+    [Fact]
+    public async Task AttachmentNameWithAngleBracketIsDroppedCleanlyAfterXhtmlNormalization()
+    {
+        // Reproduces AngleSharp's raw '>' in the attribute value after XHTML normalization
+        // (see PageXhtmlBuilderTests.ObjectRegexSurvivesXhtmlNormalizationWhenFileNameContainsAngleBracket).
+        // The drop path here uses the same ObjectRegex and must still find and replace the whole element.
+        var a = Att(1, 2_000_000, "a>b.pdf");
+        var images = new List<ResolvedImage> { new("img0", "image/png", new byte[1_750_000]) };
+        var resolved = await new ImageResolver().ResolveWithReportAsync(XhtmlWith(1, a), []);
+        var plan = PagePlanner.Plan(new PageContent(resolved.Xhtml, images, [a]));
+        Assert.Equal(["img0"], plan.Parts.Select(p => p.Name));
+        Assert.Equal(["att1"], plan.DroppedPartNames);
+        Assert.DoesNotContain("name:att1", plan.PresentationXhtml);
+        Assert.Contains("[attachment omitted:", plan.PresentationXhtml);
+        Assert.Contains("too large for OneNote online", plan.PresentationXhtml);
+    }
 }

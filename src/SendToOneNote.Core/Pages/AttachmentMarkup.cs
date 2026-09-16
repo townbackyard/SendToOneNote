@@ -34,12 +34,15 @@ public static class AttachmentMarkup
     };
 
     /// <summary>Matches the whole element for one part regardless of attribute order, whether serialized
-    /// as &lt;object …/&gt; or &lt;object …&gt;&lt;/object&gt; (AngleSharp may emit either).</summary>
+    /// as &lt;object …/&gt; or &lt;object …&gt;&lt;/object&gt; (AngleSharp may emit either). The attribute
+    /// scan is quote-aware ((?:[^>"]|"[^"]*")*?) rather than a plain [^>]*: AngleSharp's XhtmlMarkupFormatter
+    /// escapes only &amp;, &lt;, " in attribute values, so a file name containing '>' is re-emitted raw
+    /// (data-attachment="a>b.pdf") and a naive [^>]* stops at that '>' before ever reaching data="name:…".</summary>
     public static Regex ObjectRegex(string partName) =>
-        new($"<object\\b[^>]*\\bdata=\"name:{Regex.Escape(partName)}\"[^>]*(?:/>|>\\s*</object>)", RegexOptions.Singleline);
+        new($"<object\\b(?:[^>\"]|\"[^\"]*\")*?\\bdata=\"name:{Regex.Escape(partName)}\"(?:[^>\"]|\"[^\"]*\")*?(?:/>|>\\s*</object>)", RegexOptions.Singleline);
 
     private static readonly Regex AnyObject =
-        new("<object\\b[^>]*\\bdata=\"name:att\\d+\"[^>]*(?:/>|>\\s*</object>)", RegexOptions.Singleline | RegexOptions.Compiled);
+        new("<object\\b(?:[^>\"]|\"[^\"]*\")*?\\bdata=\"name:att\\d+\"(?:[^>\"]|\"[^\"]*\")*?(?:/>|>\\s*</object>)", RegexOptions.Singleline | RegexOptions.Compiled);
 
     public static string StripAll(string xhtml) => AnyObject.Replace(xhtml, "");
 }

@@ -70,15 +70,15 @@ public static class EmlParser
                         // the raw headers, not from ContentType.MimeType (which is never null/empty).
                         var mime = p.Headers.Contains(HeaderId.ContentType) ? p.ContentType?.MimeType : null;
                         attachments.Add(new EmailAttachment(
-                            p.FileName ?? "attachment",
+                            CleanName(p.FileName, "attachment"),
                             string.IsNullOrWhiteSpace(mime) ? "application/octet-stream" : mime,
                             data));
                         break;
                     case MessagePart mp:
                         // Nested .eml: listed by name, never embedded (no useful handler for new-Outlook users).
                         var subject = mp.Message?.Subject;
-                        messageNames.Add(!string.IsNullOrWhiteSpace(subject) ? subject
-                            : mp.ContentDisposition?.FileName ?? "attached message");
+                        var rawName = !string.IsNullOrWhiteSpace(subject) ? subject : mp.ContentDisposition?.FileName;
+                        messageNames.Add(CleanName(rawName, "attached message"));
                         break;
                 }
             }
@@ -105,5 +105,14 @@ public static class EmlParser
         {
             throw new EmlParseException("Failed to extract email content.", ex);
         }
+    }
+
+    // A C0/C1 control character in a file name survives HtmlEncode and AngleSharp into the page
+    // XHTML (Graph rejects ill-formed XHTML) and survives into the OneNote page XML on the desktop
+    // path (OneNote rejects the page XML), so one odd name would fail the whole save on both backends.
+    private static string CleanName(string? raw, string fallback)
+    {
+        var cleaned = raw is null ? "" : new string(raw.Where(c => !char.IsControl(c)).ToArray());
+        return string.IsNullOrWhiteSpace(cleaned) ? fallback : cleaned;
     }
 }

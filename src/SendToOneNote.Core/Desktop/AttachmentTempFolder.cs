@@ -51,7 +51,10 @@ public sealed class AttachmentTempFolder : IDisposable
     public static string SanitiseFileName(string name)
     {
         var invalid = System.IO.Path.GetInvalidFileNameChars();
-        var cleaned = new string(name.Select(c => invalid.Contains(c) ? '_' : c).ToArray()).Trim().TrimEnd('.');
+        // Trim trailing spaces AND dots to convergence (TrimEnd(params char[]) removes any run of
+        // those characters, in any mixture/order): Win32 itself strips a trailing space or dot at
+        // create time, so "file ." and "file" would otherwise collide on disk.
+        var cleaned = new string(name.Select(c => invalid.Contains(c) ? '_' : c).ToArray()).Trim().TrimEnd(' ', '.');
         return cleaned.Length == 0 || cleaned.All(c => c == '.' || c == '_') ? "attachment" : cleaned;
     }
 

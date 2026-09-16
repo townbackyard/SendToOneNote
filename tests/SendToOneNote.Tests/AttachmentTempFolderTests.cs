@@ -42,6 +42,8 @@ public class AttachmentTempFolderTests : IDisposable
     [InlineData("   ", "attachment")]
     [InlineData("..", "attachment")]
     [InlineData("plain.docx", "plain.docx")]
+    [InlineData("file .", "file")]
+    [InlineData("file . . ", "file")]
     public void SanitisesNames(string input, string expected) =>
         Assert.Equal(expected, AttachmentTempFolder.SanitiseFileName(input));
 

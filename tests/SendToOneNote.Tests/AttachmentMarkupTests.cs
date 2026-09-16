@@ -49,7 +49,7 @@ public class AttachmentMarkupTests
     public void ObjectRegexDoesNotMatchOtherParts()
     {
         var xhtml = "<object data-attachment=\"a.pdf\" data=\"name:att10\" type=\"x\"></object>";
-        Assert.False(AttachmentMarkup.ObjectRegex("att1").IsMatch(xhtml));
+        Assert.DoesNotMatch(AttachmentMarkup.ObjectRegex("att1"), xhtml);
     }
 
     [Fact]

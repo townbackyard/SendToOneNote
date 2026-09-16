@@ -136,4 +136,59 @@ public class PagePlannerTests
         Assert.DoesNotContain("name:img0", plan.PresentationXhtml);
         Assert.Contains("image omitted", plan.PresentationXhtml);
     }
+
+    private static PlannedAttachment Att(int n, int bytes, string name = "f.pdf") =>
+        new($"att{n}", new SendToOneNote.Core.Email.EmailAttachment(name, "application/pdf", new byte[bytes]));
+
+    private static string XhtmlWith(int images, params PlannedAttachment[] atts)
+    {
+        var objs = string.Concat(atts.Select(AttachmentMarkup.ObjectElement));
+        var imgs = string.Join("", Enumerable.Range(0, images).Select(i => $"<img src=\"name:img{i}\"/>"));
+        return $"<html><head><title>t</title></head><body>{objs}{imgs}</body></html>";
+    }
+
+    [Fact]
+    public void AttachmentThatFitsBecomesAPartAfterImages()
+    {
+        var a = Att(1, 1000);
+        var plan = PagePlanner.Plan(new PageContent(XhtmlWith(2, a), Images(2), [a]));
+        Assert.Equal(["img0", "img1", "att1"], plan.Parts.Select(p => p.Name));
+        Assert.Equal("application/pdf", plan.Parts[2].ContentType);
+        Assert.Contains("data=\"name:att1\"", plan.PresentationXhtml);
+        Assert.Empty(plan.DroppedPartNames);
+    }
+
+    [Fact]
+    public void AttachmentOverRemainingBudgetIsDroppedWithNote()
+    {
+        // 1.75 MB image + 2 MB attachment > 3.5 MB: the image keeps priority, the file is noted.
+        var a = Att(1, 2_000_000, "big.pdf");
+        var images = new List<ResolvedImage> { new("img0", "image/png", new byte[1_750_000]) };
+        var plan = PagePlanner.Plan(new PageContent(XhtmlWith(1, a), images, [a]));
+        Assert.Equal(["img0"], plan.Parts.Select(p => p.Name));
+        Assert.Equal(["att1"], plan.DroppedPartNames);
+        Assert.DoesNotContain("name:att1", plan.PresentationXhtml);
+        Assert.Contains("[attachment omitted: big.pdf, 1.9 MB, too large for OneNote online]", plan.PresentationXhtml);
+    }
+
+    [Fact]
+    public void AttachmentBeyondPartCapIsDropped()
+    {
+        var a = Att(1, 10);
+        var images = Enumerable.Range(0, 30).Select(i => Img(i, 100, 100)).ToList();
+        var plan = PagePlanner.Plan(new PageContent(XhtmlWith(30, a), images, [a]));
+        Assert.Equal(30, plan.Parts.Count);
+        Assert.DoesNotContain(plan.Parts, p => p.Name == "att1");
+        Assert.Equal(["att1"], plan.DroppedPartNames);
+    }
+
+    [Fact]
+    public void SmallerAttachmentStillFitsAfterLargerOneIsDropped()
+    {
+        var big = Att(1, 3_600_000, "big.pdf"); // alone exceeds the 3.5 MB budget
+        var small = Att(2, 100, "small.pdf");
+        var plan = PagePlanner.Plan(new PageContent(XhtmlWith(0, big, small), [], [big, small]));
+        Assert.Equal(["att2"], plan.Parts.Select(p => p.Name));
+        Assert.Equal(["att1"], plan.DroppedPartNames);
+    }
 }

@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using SendToOneNote.Core.Auth;
 using SendToOneNote.Core.Backends;
+using SendToOneNote.Core.Email;
 using SendToOneNote.Core.OneNote;
 using SendToOneNote.Core.Pages;
 
@@ -23,14 +24,16 @@ public class GraphBackendTests
             Content = new StringContent("""{"id":"p1","links":{"oneNoteClientUrl":{"href":"onenote:x"}}}""", Encoding.UTF8, "application/json")
         });
         var backend = new GraphBackend(new OneNoteClient(new FakeTokens(), stub));
-        var content = new PageContent(
-            "<html><head><title>t</title></head><body><img src=\"name:img0\"/></body></html>",
-            [new("img0", "image/png", StubPng())], []);
-        var page = await backend.CreatePageAsync("s1", content);
+        var att = new PlannedAttachment("att1", new EmailAttachment("a.pdf", "application/pdf", [1, 2, 3]));
+        var xhtml = "<html><head><title>t</title></head><body>" + AttachmentMarkup.ObjectElement(att) +
+                    "<img src=\"name:img0\"/></body></html>";
+        var page = await backend.CreatePageAsync("s1", new PageContent(xhtml, [new("img0", "image/png", StubPng())], [att]));
         Assert.Equal("p1", page.Id);
         Assert.Equal("graph", backend.Name);
         var req = Assert.Single(stub.Requests);
         Assert.Contains("/me/onenote/sections/s1/pages", req.RequestUri!.ToString());
+        var body = await req.Content!.ReadAsStringAsync();
+        Assert.Contains("name=att1", body.Replace("\"", ""));
     }
 
     private static byte[] StubPng() => Convert.FromBase64String(

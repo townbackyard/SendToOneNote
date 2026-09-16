@@ -73,8 +73,27 @@ public static class PagePlanner
             dropped.Add(img.PartName);
         }
 
+        // Attachments come after images (readable content wins) in email order, under the same caps.
+        // One that doesn't fit is noted on the page; a later smaller one may still fit.
+        var attachmentParts = new List<OneNoteRequestPart>();
+        foreach (var a in content.Attachments)
+        {
+            var bytes = a.Attachment.Data.Length;
+            if (selected.Count + attachmentParts.Count >= MaxBinaryPartsPerRequest || bytes > budget)
+            {
+                xhtml = AttachmentMarkup.ObjectRegex(a.PartName).Replace(xhtml,
+                    AttachmentMarkup.OmittedNote(a.Attachment.FileName, bytes, AttachmentMarkup.GraphBudgetReason).Replace("$", "$$"));
+                dropped.Add(a.PartName);
+                continue;
+            }
+            budget -= bytes;
+            attachmentParts.Add(new OneNoteRequestPart(a.PartName, a.Attachment.ContentType, a.Attachment.Data));
+        }
+
         var parts = kept.Where(i => selected.Contains(i.PartName))   // document order for stability
-            .Select(i => new OneNoteRequestPart(i.PartName, i.ContentType, i.Data)).ToList();
+            .Select(i => new OneNoteRequestPart(i.PartName, i.ContentType, i.Data))
+            .Concat(attachmentParts)
+            .ToList();
         return new PagePlan(xhtml, parts, []) { DroppedPartNames = dropped };
     }
 

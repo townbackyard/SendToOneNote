@@ -197,5 +197,18 @@ public class OneNoteClientTests
         Assert.Equal(404, ex.StatusCode);
         Assert.Equal(10, stub.Requests.Count); // create + poll GET + 8 PATCH attempts
     }
+
+    [Fact]
+    public async Task AttachmentPartIsSentWithItsOwnContentType()
+    {
+        var stub = new StubHttpHandler(_ => new HttpResponseMessage(HttpStatusCode.Created)
+        { Content = new StringContent(CreatedJson, Encoding.UTF8, "application/json") });
+        var plan = new PagePlan("<html><head><title>t</title></head><body/></html>",
+            [new OneNoteRequestPart("att1", "application/pdf", [0x25, 0x50, 0x44, 0x46])], []);
+        await new OneNoteClient(new FakeTokens(), stub).CreatePageAsync("s1", plan);
+        var body = await Assert.Single(stub.Requests).Content!.ReadAsStringAsync();
+        Assert.Contains("name=att1", body.Replace("\"", ""));
+        Assert.Contains("Content-Type: application/pdf", body);
+    }
 }
 

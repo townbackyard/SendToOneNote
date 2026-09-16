@@ -29,7 +29,7 @@
 
 ## Context for a fresh session (read before Task 1)
 
-**Repo state at plan time:** `main` @ `ebb9abf`, CI green. Read `AGENTS.md`, `agents/knowledge/architecture.md`, `agents/rules/csharp.md`, and the spec above first.
+**Repo state at plan time:** `main` @ `ebb9abf`, CI green. GitHub issues #34–#41 map 1:1 to Tasks 1–8; close each when its task lands. Read `AGENTS.md`, `agents/knowledge/architecture.md`, `agents/rules/csharp.md`, and the spec above first.
 
 **Existing signatures this plan builds on (exact):**
 
@@ -1592,7 +1592,7 @@ Append:
 
 After the v1.1 line in "Planning & Scope Rules" add:
 
-`- v2 attachments spec: `docs/superpowers/specs/2026-09-15-attachments-design.md`. Plan: `docs/superpowers/plans/2026-09-15-attachments.md`. GitHub issues map 1:1 to its Tasks 1–8 (see the plan header for numbers).`
+`- v2 attachments spec: `docs/superpowers/specs/2026-09-15-attachments-design.md`. Plan: `docs/superpowers/plans/2026-09-15-attachments.md`. GitHub issues #34–#41 map 1:1 to its Tasks 1–8; #42–#43 are follow-ups (image attachments as pictures, PDF printouts).`
 
 Update the "v2 candidates" sentence so "attachments option" is no longer listed as out of scope (it is implemented); the remaining candidates stay.
 

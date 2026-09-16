@@ -43,9 +43,12 @@ public sealed class DesktopOneNoteBackend : IOneNoteBackend
             return Guard(() =>
             {
                 var title = OneNotePageXmlBuilder.ExtractTitle(content.Xhtml);
-                var html = DataUriInliner.Inline(content.Xhtml, content.Images);
+                var html = DataUriInliner.Inline(AttachmentMarkup.StripAll(content.Xhtml), content.Images);
+                // Bytes must be on disk for one:InsertedFile; the folder is deleted when this block exits,
+                // success or failure — OneNote has copied them into the notebook by then.
+                using var temp = AttachmentTempFolder.Create(content.Attachments);
                 App.CreateNewPage(sectionId, out var pageId, OneNoteConstants.NpsDefault);
-                App.UpdatePageContent(OneNotePageXmlBuilder.Build(pageId, title, html),
+                App.UpdatePageContent(OneNotePageXmlBuilder.Build(pageId, title, html, temp.Files),
                     DateTime.MinValue, OneNoteConstants.Xs2013, false);
                 App.GetHyperlinkToObject(pageId, "", out var link);
                 return new CreatedPage(pageId, link, null);

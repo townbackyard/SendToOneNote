@@ -34,4 +34,26 @@ public class OneNotePageXmlBuilderTests
         Assert.Equal("S & T", OneNotePageXmlBuilder.ExtractTitle("<html><head><title>S &amp; T</title></head><body/></html>"));
         Assert.Equal("(no subject)", OneNotePageXmlBuilder.ExtractTitle("<html><body/></html>"));
     }
+
+    [Fact]
+    public void InsertedFilesGoInTheirOwnOutlineBeforeTheHtmlBlock()
+    {
+        var xml = OneNotePageXmlBuilder.Build("{P}", "t", "<p>hi</p>",
+            [new InsertedFile(@"C:\tmp\a & b.pdf", "a & b.pdf"), new InsertedFile(@"C:\tmp\c.docx", "c.docx")]);
+        var doc = XDocument.Parse(xml);
+        XNamespace one = OneNoteConstants.Namespace2013;
+        var outlines = doc.Root!.Elements(one + "Outline").ToList();
+        Assert.Equal(2, outlines.Count);
+        var files = outlines[0].Element(one + "OEChildren")!.Elements(one + "OE")
+            .Select(oe => oe.Element(one + "InsertedFile")!).ToList();
+        Assert.Equal(2, files.Count);
+        Assert.Equal(@"C:\tmp\a & b.pdf", files[0].Attribute("pathSource")!.Value);
+        Assert.Equal("a & b.pdf", files[0].Attribute("preferredName")!.Value);
+        Assert.NotNull(outlines[1].Element(one + "OEChildren")!.Element(one + "HTMLBlock"));
+    }
+
+    [Fact]
+    public void NoFilesIsIdenticalToThreeArgumentBuild() =>
+        Assert.Equal(OneNotePageXmlBuilder.Build("{P}", "t", "<p>hi</p>"),
+            OneNotePageXmlBuilder.Build("{P}", "t", "<p>hi</p>", []));
 }

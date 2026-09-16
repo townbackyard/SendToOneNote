@@ -17,12 +17,25 @@ public sealed class FakeOneNoteApplication : IApplication
     public int ManagedThreadIdOfLastCall { get; private set; }
     public Exception? ThrowOnUpdate { get; set; }
 
+    /// <summary>pathSource → bytes, read DURING UpdatePageContent (the files must exist then, not after).</summary>
+    public Dictionary<string, byte[]> FilesSeenDuringUpdate { get; } = [];
+
     public void GetHierarchy(string bstrStartNodeID, int hsScope, out string pbstrHierarchyXmlOut, int xsSchema)
     { Touch(); pbstrHierarchyXmlOut = HierarchyXml; }
     public void CreateNewPage(string bstrSectionID, out string pbstrPageID, int npsNewPageStyle)
     { Touch(); CreatedPages.Add((bstrSectionID, npsNewPageStyle)); pbstrPageID = NextPageId; }
     public void UpdatePageContent(string bstrPageChangesXmlIn, DateTime dateExpectedLastModified, int xsSchema, bool force)
-    { Touch(); if (ThrowOnUpdate is not null) throw ThrowOnUpdate; UpdatedPageXml.Add(bstrPageChangesXmlIn); }
+    {
+        Touch();
+        if (ThrowOnUpdate is not null) throw ThrowOnUpdate;
+        foreach (System.Text.RegularExpressions.Match m in
+                 System.Text.RegularExpressions.Regex.Matches(bstrPageChangesXmlIn, "pathSource=\"([^\"]+)\""))
+        {
+            var path = System.Net.WebUtility.HtmlDecode(m.Groups[1].Value);
+            FilesSeenDuringUpdate[path] = File.Exists(path) ? File.ReadAllBytes(path) : [];
+        }
+        UpdatedPageXml.Add(bstrPageChangesXmlIn);
+    }
     public void GetHyperlinkToObject(string bstrHierarchyID, string bstrPageContentObjectID, out string pbstrHyperlinkOut)
     { Touch(); pbstrHyperlinkOut = Hyperlink; }
 

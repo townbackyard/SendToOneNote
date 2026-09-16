@@ -1,4 +1,6 @@
 using SendToOneNote.Core.Auth;
+using SendToOneNote.Core.Backends;
+using SendToOneNote.Core.Email;
 using SendToOneNote.Core.OneNote;
 using SendToOneNote.Core.Pages;
 
@@ -70,6 +72,27 @@ public class IntegrationSmokeTests
         var plan = new PagePlan(xhtml, parts, []);
 
         var page = await client.CreatePageAsync(scratch!.Id, plan);
+        Assert.NotEmpty(page.Id);
+    }
+
+    [SkippableFact]
+    public async Task EmbedsPdfAttachmentViaGraph()
+    {
+        Skip.If(Environment.GetEnvironmentVariable("STN_INTEGRATION") != "1",
+            "Set STN_INTEGRATION=1 to run against the real Graph API.");
+        var tokens = new MsalTokenProvider(Path.Combine(Path.GetTempPath(), "stn-int"));
+        var backend = new GraphBackend(new OneNoteClient(tokens));
+        var tree = await backend.GetTreeAsync();
+        var scratch = tree.Notebooks.SelectMany(n => n.Sections).FirstOrDefault(s => s.Name == "SendToOneNote Test");
+        Skip.If(scratch is null, "Create a section named 'SendToOneNote Test' first.");
+
+        var email = EmlParser.Parse(Fixtures.Open("pdf-attachment.eml"));
+        var plan = AttachmentPlanner.Plan(email, true, 26_214_400);
+        var resolution = await new ImageResolver().ResolveWithReportAsync(PageXhtmlBuilder.Build(email, plan), email.InlineImages);
+        var content = new PageContent(resolution.Xhtml, resolution.Images, plan.Embedded);
+        Assert.Single(PagePlanner.Plan(content).Parts); // the PDF is the only part
+
+        var page = await backend.CreatePageAsync(scratch!.Id, content);
         Assert.NotEmpty(page.Id);
     }
 }

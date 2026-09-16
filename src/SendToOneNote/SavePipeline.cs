@@ -69,15 +69,20 @@ public sealed class SavePipeline(
             });
             if (pick is null) { log.Info($"Cancelled: {path}"); return; }
 
-            var xhtml = PageXhtmlBuilder.Build(email);
+            var attachmentPlan = AttachmentPlanner.Plan(email, settings.IncludeAttachments, settings.MaxAttachmentBytes);
+            foreach (var o in attachmentPlan.Omitted)
+                log.Info($"Attachment skipped ({o.Reason}): {o.FileName}, {o.Bytes} bytes");
+            var xhtml = PageXhtmlBuilder.Build(email, attachmentPlan);
             var resolution = await _images.ResolveWithReportAsync(xhtml, email.InlineImages);
-            var content = new PageContent(resolution.Xhtml, resolution.Images, []);
+            var content = new PageContent(resolution.Xhtml, resolution.Images, attachmentPlan.Embedded);
             var page = await backend.CreatePageAsync(pick.SectionId, content);
+            if (attachmentPlan.Embedded.Count > 0)
+                log.Info($"Embedded {attachmentPlan.Embedded.Count} attachment(s) on the {backend.Name} path");
             if (settings.ImageDiagnostics)
             {
                 try
                 {
-                    // Only the Graph path can drop images (the 3.5 MB request cap);
+                    // Only the Graph path can drop images or attachments (the 3.5 MB request cap);
                     // the desktop backend embeds every part.
                     IReadOnlyList<string> droppedMinor = backend.Name == "graph"
                         ? PagePlanner.Plan(content).DroppedPartNames

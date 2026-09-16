@@ -19,5 +19,5 @@
 - [ ] Email with a PDF attachment → file icon under the header on the desktop path; double-click opens the PDF after the temp folder is gone
 - [ ] Same email with `"Backend": "graph"` → file icon on the page via Graph
 - [ ] `"MaxAttachmentBytes": 1000` → grey "[attachment omitted: …, over the size limit]" note, page still created
-- [ ] `"IncludeAttachments": false` → names listed in the header only, no icons, no notes
+- [ ] `"IncludeAttachments": false` → names listed in the header only, no file icons, no size notes (an attached-message note still appears)
 - [ ] Email with an attached message → "[attached message not embedded: …]" note

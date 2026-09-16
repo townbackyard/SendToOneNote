@@ -85,7 +85,8 @@ public static AttachmentPlan Plan(ParsedEmail email, bool includeAttachments, lo
 Rules:
 
 - `includeAttachments == false` → `AttachmentPlan.Empty`. The page looks exactly as it does today
-  (header row still lists names; no object tags, no notes).
+  (header row still lists names; no object tags, no omission notes — the attached-message note is
+  independent of the switch).
 - Otherwise every file whose `Data.Length > maxAttachmentBytes` is omitted with reason
   `over the size limit`; the rest are embedded, numbered `att1…attN` in email order.
 - Attached messages are never candidates; the builder notes them separately (see below).
@@ -255,3 +256,5 @@ machine, created and deleted within one save. Logs record file names and sizes, 
   attachments are separate backlog issues.
 - Files under the header (owner) — where the eye lands on receipts and invoices.
 - `PageContent` record on the seam (owner) — cleaner than a fourth parameter; one-time mechanical churn.
+- IncludeAttachments=false suppresses file objects and omission notes only; the attached-message note
+  still appears because it is true regardless of the switch (final review, 2026-09-15).

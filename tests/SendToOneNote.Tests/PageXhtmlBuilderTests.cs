@@ -70,11 +70,14 @@ public class PageXhtmlBuilderTests
         new("s", "a@b.c", "d@e.f", null, null, "<p>hi</p>", null, [], [], messageNames);
 
     [Fact]
-    public void EmptyPlanIsByteIdenticalToSingleArgumentBuild()
+    public void EmptyPlanKeepsThePreV2TableHrDivLayout()
     {
+        // Pins the pre-v2 shape directly (rather than comparing the two Build overloads, which
+        // cannot fail since the one-arg overload just delegates to the two-arg one).
         var email = Email(html: "<p>hi</p>", attachments: ["report.pdf"]);
-        Assert.Equal(PageXhtmlBuilder.Build(email), PageXhtmlBuilder.Build(email, AttachmentPlan.Empty));
-        Assert.DoesNotContain("stn-attachments", PageXhtmlBuilder.Build(email));
+        var x = PageXhtmlBuilder.Build(email, AttachmentPlan.Empty);
+        Assert.Contains("</table><hr/><div>", x);
+        Assert.DoesNotContain("stn-attachments", x);
     }
 
     [Fact]

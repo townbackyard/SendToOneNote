@@ -41,16 +41,16 @@ SendToOneNote/
 
 ## The save pipeline
 
-One email flows: `DropFolderWatcher` (readiness-polls the .eml until Outlook releases it) → `EmlParser` (headers, best body, inline CID images, attachment names) → `PickerWindow` over `SectionPickerViewModel` (per-backend recents; type-to-filter; cached notebook tree on Graph, fetched fresh on desktop) → `PageXhtmlBuilder` (title, header table, body; plain-text→paragraphs or `<pre>` when columnar) → `ImageResolver.ResolveWithReportAsync` (normalizes email HTML to well-formed XHTML via AngleSharp; drops tracking pixels/spacers before download; embeds cid:/remote images as `name:imgN` parts, failures keep the original URL; records a per-image `ImageDecision`) → `IOneNoteBackend.CreatePageAsync` (see Backends below — `GraphBackend` ranks/caps/drops via `PagePlanner` then calls `OneNoteClient`; `DesktopOneNoteBackend` base64-inlines every resolved image and writes via COM) → toast with the returned `ClientUrl`; .eml deleted on success or moved to `Failed\`.
+One email flows: `DropFolderWatcher` (readiness-polls the .eml until Outlook releases it) → `EmlParser` (headers, best body, inline CID images, attachments with bytes, attached-message names) → `PickerWindow` over `SectionPickerViewModel` (per-backend recents; type-to-filter; cached notebook tree on Graph, fetched fresh on desktop) → `AttachmentPlanner` (`IncludeAttachments` switch + `MaxAttachmentBytes` cap → `att1…attN`) → `PageXhtmlBuilder` (title, header table, attachment objects/notes, body; plain-text→paragraphs or `<pre>` when columnar) → `ImageResolver.ResolveWithReportAsync` (normalizes email HTML to well-formed XHTML via AngleSharp; drops tracking pixels/spacers before download; embeds cid:/remote images as `name:imgN` parts, failures keep the original URL; records a per-image `ImageDecision`) → `IOneNoteBackend.CreatePageAsync(sectionId, PageContent{Xhtml, Images, Attachments})` (see Backends below — `GraphBackend` ranks/caps/drops via `PagePlanner` then calls `OneNoteClient`; `DesktopOneNoteBackend` base64-inlines every resolved image and writes via COM) → toast with the returned `ClientUrl`; .eml deleted on success or moved to `Failed\`.
 
 The source email account never authenticates — content comes entirely from the local .eml. Only the destination Microsoft account (whose OneDrive holds the notebooks) signs in, and only on the Graph path.
 
 ## Backends
 
-`IOneNoteBackend` (`Core/Backends/IOneNoteBackend.cs`) is the seam `SavePipeline` depends on: `Name` (`"desktop"` | `"graph"`), `GetTreeAsync`, `CreatePageAsync(sectionId, pageXhtml, images)`. Two implementations:
+`IOneNoteBackend` (`Core/Backends/IOneNoteBackend.cs`) is the seam `SavePipeline` depends on: `Name` (`"desktop"` | `"graph"`), `GetTreeAsync`, `CreatePageAsync(sectionId, PageContent content)`. Two implementations:
 
-- `GraphBackend` — thin wrapper: `PagePlanner.Plan` (rank/cap/drop, see the Graph constraints below) then `OneNoteClient` over HTTP.
-- `DesktopOneNoteBackend` — writes into the local desktop OneNote app via COM: `CreateNewPage` → `UpdatePageContent` (a `one:HTMLBlock` page built by `OneNotePageXmlBuilder`, images base64-inlined by `DataUriInliner`) → `GetHyperlinkToObject` for the toast link. On an RPC-disconnect HRESULT (OneNote exited/restarted) it drops and recreates the RCW so the next call re-activates OneNote instead of failing identically forever; a malformed-XML or read-only-section HRESULT leaves the cached RCW in place. Cancellation is honored at the queue boundary (before a queued job starts), not mid-COM-call.
+- `GraphBackend` — thin wrapper: `PagePlanner.Plan` (rank/cap/drop, see the Graph constraints below) then `OneNoteClient` over HTTP. Attachments become `attN` parts after the images under the same caps; ones that don't fit are replaced by a grey note.
+- `DesktopOneNoteBackend` — writes into the local desktop OneNote app via COM: `CreateNewPage` → `UpdatePageContent` (a `one:HTMLBlock` page built by `OneNotePageXmlBuilder`, images base64-inlined by `DataUriInliner`) → `GetHyperlinkToObject` for the toast link. On an RPC-disconnect HRESULT (OneNote exited/restarted) it drops and recreates the RCW so the next call re-activates OneNote instead of failing identically forever; a malformed-XML or read-only-section HRESULT leaves the cached RCW in place. Cancellation is honored at the queue boundary (before a queued job starts), not mid-COM-call. Attachments: object markup is stripped from the HTML, bytes are written to `%TEMP%\SendToOneNote\<guid>\` on the worker thread, the page XML gets a `one:InsertedFile` outline ahead of the HTML block, and the temp folder is deleted in a `finally`.
 
 `BackendSelector.Choose(settings.Backend, desktopAvailableProbe)`: `"graph"` forces Graph even when desktop OneNote is present; `"desktop"` forces COM and throws a startup error if unavailable; `"auto"` (default) picks desktop when `DesktopOneNoteProbe.IsAvailable()` succeeds, else Graph. `TrayContext` runs the probe on the `StaComWorker` and shows the choice in the tray tooltip; "Sign in again" is only added to the tray menu when Graph is active.
 
@@ -66,15 +66,18 @@ Recents and the tree cache are per backend: `AppSettings.RecentSectionIds` (Grap
 - Input must be well-formed UTF-8 XHTML; the service strips scripts/forms/complex CSS, tables lose rowspan/colspan. Email layouts simplify — that's the API, not a bug.
 - Section-group nesting deeper than one level requires recursive `GET /me/onenote/sectionGroups/{id}/sectionGroups` calls; `$expand` only goes one level down.
 - All GETs follow `@odata.nextLink` paging.
+- Attachments: `<object data-attachment="name" data="name:attN" type="…"></object>` per file, counted against the 30-part / 3.5 MB caps after images.
 
 ## App data (runtime)
 
-`%APPDATA%\SendToOneNote\`: `settings.json` (drop folder, ClientIdOverride, DeleteOnSuccess, `Backend`, `ImageDiagnostics`, recent section ids per backend), `cache.json` (Graph notebook tree only — the desktop tree isn't cached), `msal_cache.bin` (encrypted tokens, Graph only), `logs\stn-YYYYMMDD.log`. Diagnostics dumps (when `ImageDiagnostics` is on) live under `<DropFolder>\Diagnostics\`, not `%APPDATA%`.
+`%APPDATA%\SendToOneNote\`: `settings.json` (drop folder, ClientIdOverride, DeleteOnSuccess, `Backend`, `ImageDiagnostics`, `IncludeAttachments`, `MaxAttachmentBytes`, recent section ids per backend), `cache.json` (Graph notebook tree only — the desktop tree isn't cached), `msal_cache.bin` (encrypted tokens, Graph only), `logs\stn-YYYYMMDD.log`. Diagnostics dumps (when `ImageDiagnostics` is on) live under `<DropFolder>\Diagnostics\`, not `%APPDATA%`.
+
+`%TEMP%\SendToOneNote\<guid>\` — per-save attachment temp files for the COM import, deleted after each save.
 
 ## Testing model
 
-- Unit tests: Core only, synthetic fixtures, stubbed `HttpMessageHandler` — no network, no auth.
+- Unit tests: Core only, synthetic fixtures (including `pdf-attachment.eml` and `attached-message.eml`), stubbed `HttpMessageHandler` — no network, no auth.
 - `LocalFixtureTests`: run only when `fixtures/local/` exists (owner's machine); skip on CI.
-- `IntegrationSmokeTests`: gated on `STN_INTEGRATION=1`; real sign-in, creates pages in a section named "SendToOneNote Test" via Graph.
-- `DesktopIntegrationSmokeTests`: gated on `STN_INTEGRATION=1`; requires desktop OneNote and the same "SendToOneNote Test" section; creates a page with a remote + inline image via `DesktopOneNoteBackend` and reads it back with `GetPageContent(piBinaryData)` to assert both are stored embedded.
+- `IntegrationSmokeTests`: gated on `STN_INTEGRATION=1`; real sign-in, creates pages in a section named "SendToOneNote Test" via Graph. `EmbedsPdfAttachmentViaGraph` saves `pdf-attachment.eml` and asserts the PDF is the only Graph request part.
+- `DesktopIntegrationSmokeTests`: gated on `STN_INTEGRATION=1`; requires desktop OneNote and the same "SendToOneNote Test" section; creates a page with a remote + inline image via `DesktopOneNoteBackend` and reads it back with `GetPageContent(piBinaryData)` to assert both are stored embedded. `EmbedsPdfAttachmentAsInsertedFile` saves `pdf-attachment.eml` and asserts a `one:InsertedFile` with the PDF's name and that the temp folder is gone afterward.
 - WPF layer has no automated UI tests; its logic lives in Core view-models, and the E2E checklist (`docs/e2e-checklist.md`) covers the rest.

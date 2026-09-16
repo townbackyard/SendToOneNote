@@ -24,6 +24,13 @@ override the automatic choice: `"graph"` always uses the cloud path,
 `"desktop"` always requires desktop OneNote; the default `"auto"` picks
 desktop OneNote when it's present.
 
+File attachments are embedded on the page as real file objects, right
+under the header block, on both paths. Attached emails are listed by
+name only. `"IncludeAttachments": false` in settings.json turns this off;
+`"MaxAttachmentBytes"` (default 26214400 = 25 MB) skips larger files with
+a note on the page. On the Graph path a file that doesn't fit the 3.5 MB
+request budget is also skipped with a note.
+
 ## Install
 
 1. Download the latest release zip, unzip, run SendToOneNote.exe.

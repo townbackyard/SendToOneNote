@@ -9,7 +9,6 @@ public sealed class GraphBackend(OneNoteClient client) : IOneNoteBackend
 
     public Task<NotebookTree> GetTreeAsync(CancellationToken ct = default) => client.GetNotebookTreeAsync(ct);
 
-    public Task<CreatedPage> CreatePageAsync(string sectionId, string pageXhtml, IReadOnlyList<ResolvedImage> images,
-        CancellationToken ct = default) =>
-        client.CreatePageAsync(sectionId, PagePlanner.Plan(pageXhtml, images), ct);
+    public Task<CreatedPage> CreatePageAsync(string sectionId, PageContent content, CancellationToken ct = default) =>
+        client.CreatePageAsync(sectionId, PagePlanner.Plan(content), ct);
 }

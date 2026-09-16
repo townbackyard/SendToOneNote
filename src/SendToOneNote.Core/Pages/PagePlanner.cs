@@ -29,8 +29,10 @@ public static class PagePlanner
     /// Graph path only: everything fits in ONE request or is dropped. Images are ranked by
     /// rendered area (early ones boosted); the desktop backend never calls this.
     /// </summary>
-    public static PagePlan Plan(string xhtml, IReadOnlyList<ResolvedImage> images)
+    public static PagePlan Plan(PageContent content)
     {
+        var xhtml = content.Xhtml;
+        var images = content.Images;
         var dropped = new List<string>();
 
         var shrunk = images.Select(i =>

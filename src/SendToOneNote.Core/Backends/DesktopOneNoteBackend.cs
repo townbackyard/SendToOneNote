@@ -36,15 +36,14 @@ public sealed class DesktopOneNoteBackend : IOneNoteBackend
             });
         });
 
-    public Task<CreatedPage> CreatePageAsync(string sectionId, string pageXhtml, IReadOnlyList<ResolvedImage> images,
-        CancellationToken ct = default) =>
+    public Task<CreatedPage> CreatePageAsync(string sectionId, PageContent content, CancellationToken ct = default) =>
         _worker.RunAsync(() =>
         {
             ct.ThrowIfCancellationRequested();
             return Guard(() =>
             {
-                var title = OneNotePageXmlBuilder.ExtractTitle(pageXhtml);
-                var html = DataUriInliner.Inline(pageXhtml, images);
+                var title = OneNotePageXmlBuilder.ExtractTitle(content.Xhtml);
+                var html = DataUriInliner.Inline(content.Xhtml, content.Images);
                 App.CreateNewPage(sectionId, out var pageId, OneNoteConstants.NpsDefault);
                 App.UpdatePageContent(OneNotePageXmlBuilder.Build(pageId, title, html),
                     DateTime.MinValue, OneNoteConstants.Xs2013, false);

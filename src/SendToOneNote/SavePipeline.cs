@@ -71,7 +71,8 @@ public sealed class SavePipeline(
 
             var xhtml = PageXhtmlBuilder.Build(email);
             var resolution = await _images.ResolveWithReportAsync(xhtml, email.InlineImages);
-            var page = await backend.CreatePageAsync(pick.SectionId, resolution.Xhtml, resolution.Images);
+            var content = new PageContent(resolution.Xhtml, resolution.Images, []);
+            var page = await backend.CreatePageAsync(pick.SectionId, content);
             if (settings.ImageDiagnostics)
             {
                 try
@@ -79,7 +80,7 @@ public sealed class SavePipeline(
                     // Only the Graph path can drop images (the 3.5 MB request cap);
                     // the desktop backend embeds every part.
                     IReadOnlyList<string> droppedMinor = backend.Name == "graph"
-                        ? PagePlanner.Plan(resolution.Xhtml, resolution.Images).DroppedPartNames
+                        ? PagePlanner.Plan(content).DroppedPartNames
                         : [];
                     var folder = ImageDiagnosticsWriter.Write(Path.GetDirectoryName(path)!,
                         Path.GetFileNameWithoutExtension(path), resolution.Decisions, resolution.Images, droppedMinor, DateTime.Now);

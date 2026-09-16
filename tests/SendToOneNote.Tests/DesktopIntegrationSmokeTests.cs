@@ -27,7 +27,7 @@ public class DesktopIntegrationSmokeTests
                     "<p>inline:</p><img src=\"name:img0\" width=\"64\" height=\"64\"/></body></html>";
         var images = new List<ResolvedImage> { new("img0", "image/png", Convert.FromBase64String(RedPng), 1, 1) };
 
-        var page = await backend.CreatePageAsync(scratch!.Id, xhtml, images);
+        var page = await backend.CreatePageAsync(scratch!.Id, new PageContent(xhtml, images, []));
         Assert.NotEmpty(page.Id);
         Assert.StartsWith("onenote:", page.ClientUrl);
 

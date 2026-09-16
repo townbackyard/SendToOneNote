@@ -16,10 +16,13 @@ public class PagePlannerTests
     private static IReadOnlyList<ResolvedImage> Images(int n) =>
         Enumerable.Range(0, n).Select(i => new ResolvedImage($"img{i}", "image/png", Png)).ToList();
 
+    private static PagePlan Plan(string xhtml, IReadOnlyList<ResolvedImage> images) =>
+        PagePlanner.Plan(new PageContent(xhtml, images, []));
+
     [Fact]
     public void FewImagesSingleRequest()
     {
-        var plan = PagePlanner.Plan(XhtmlWith(3), Images(3));
+        var plan = Plan(XhtmlWith(3), Images(3));
         Assert.Equal(3, plan.Parts.Count);
         Assert.Empty(plan.Appends);
         Assert.Contains("name:img2", plan.PresentationXhtml);
@@ -31,7 +34,7 @@ public class PagePlannerTests
     public void ImagesBeyondPartCapAreDroppedNotAppended()
     {
         var images = Enumerable.Range(0, 33).Select(i => Img(i, 100, 100)).ToList();
-        var plan = PagePlanner.Plan(XhtmlWith(33), images);
+        var plan = Plan(XhtmlWith(33), images);
         Assert.Equal(30, plan.Parts.Count);
         Assert.Empty(plan.Appends);
         Assert.Equal(3, plan.DroppedPartNames.Count);
@@ -49,7 +52,7 @@ public class PagePlannerTests
         // sort) as the one dropped. Without ranking, img30 itself would be dropped
         // (it's last in document order and the cap is hit before reaching it).
         var images = Enumerable.Range(0, 31).Select(i => Img(i, i == 30 ? 800 : 10, i == 30 ? 600 : 10)).ToList();
-        var plan = PagePlanner.Plan(XhtmlWith(31), images);
+        var plan = Plan(XhtmlWith(31), images);
         Assert.Contains(plan.Parts, p => p.Name == "img30");
         Assert.Equal(["img29"], plan.DroppedPartNames);
     }
@@ -62,7 +65,7 @@ public class PagePlannerTests
         // and img30 (last, unboosted) is the one dropped. Without the boost, img0
         // (lowest score, first among ties) would be dropped instead.
         var images = Enumerable.Range(0, 31).Select(i => Img(i, i < 3 ? 10 : 15, i < 3 ? 10 : 15)).ToList();
-        var plan = PagePlanner.Plan(XhtmlWith(31), images);
+        var plan = Plan(XhtmlWith(31), images);
         Assert.Equal(["img30"], plan.DroppedPartNames);
     }
 
@@ -84,7 +87,7 @@ public class PagePlannerTests
             new("img1", "image/png", new byte[1_750_000]),
             Img(2, 50, 50),
         };
-        var plan = PagePlanner.Plan(XhtmlWith(3), images);
+        var plan = Plan(XhtmlWith(3), images);
         Assert.Equal(["img0", "img2"], plan.Parts.Select(p => p.Name));
         Assert.Equal(["img1"], plan.DroppedPartNames);
         Assert.DoesNotContain("name:img1", plan.PresentationXhtml);
@@ -97,7 +100,7 @@ public class PagePlannerTests
             $"<img alt=\"pic {i}\" width=\"600\" src=\"name:img{i}\" style=\"border:0\" />"));
         var xhtml = $"<html><head><title>t</title></head><body>{imgs}</body></html>";
         var images = Enumerable.Range(0, 31).Select(i => Img(i, i == 30 ? 1 : 50, i == 30 ? 1 : 50)).ToList();
-        var plan = PagePlanner.Plan(xhtml, images);
+        var plan = Plan(xhtml, images);
         Assert.Equal(["img30"], plan.DroppedPartNames);
         Assert.DoesNotContain("pic 30", plan.PresentationXhtml);
         Assert.Contains("pic 29", plan.PresentationXhtml);
@@ -127,7 +130,7 @@ public class PagePlannerTests
     public void UndecodableOversizedImageIsDropped()
     {
         var big = new byte[4_000_000]; // not a decodable image; shrinker passes it through
-        var plan = PagePlanner.Plan(XhtmlWith(1), [new ResolvedImage("img0", "image/png", big)]);
+        var plan = Plan(XhtmlWith(1), [new ResolvedImage("img0", "image/png", big)]);
         Assert.Empty(plan.Parts);
         Assert.Empty(plan.Appends);
         Assert.DoesNotContain("name:img0", plan.PresentationXhtml);

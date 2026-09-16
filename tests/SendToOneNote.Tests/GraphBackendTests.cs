@@ -3,6 +3,7 @@ using System.Text;
 using SendToOneNote.Core.Auth;
 using SendToOneNote.Core.Backends;
 using SendToOneNote.Core.OneNote;
+using SendToOneNote.Core.Pages;
 
 namespace SendToOneNote.Tests;
 
@@ -22,9 +23,10 @@ public class GraphBackendTests
             Content = new StringContent("""{"id":"p1","links":{"oneNoteClientUrl":{"href":"onenote:x"}}}""", Encoding.UTF8, "application/json")
         });
         var backend = new GraphBackend(new OneNoteClient(new FakeTokens(), stub));
-        var page = await backend.CreatePageAsync("s1",
+        var content = new PageContent(
             "<html><head><title>t</title></head><body><img src=\"name:img0\"/></body></html>",
-            [new("img0", "image/png", StubPng())]);
+            [new("img0", "image/png", StubPng())], []);
+        var page = await backend.CreatePageAsync("s1", content);
         Assert.Equal("p1", page.Id);
         Assert.Equal("graph", backend.Name);
         var req = Assert.Single(stub.Requests);

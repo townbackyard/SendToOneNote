@@ -34,7 +34,7 @@ public class IntegrationSmokeTests
         var images = Enumerable.Range(0, 33)
             .Select(i => new ResolvedImage($"img{i}", "image/png", (byte[])PngBytes.Clone()))
             .ToList();
-        var plan = PagePlanner.Plan(xhtml, images);
+        var plan = PagePlanner.Plan(new PageContent(xhtml, images, []));
         Assert.Empty(plan.Appends);
         Assert.Equal(30, plan.Parts.Count);
 

@@ -10,10 +10,12 @@ SendToOneNote/
 │   ├── SendToOneNote.Core/       # All logic; no UI dependencies (net10.0-windows)
 │   │   ├── Email/                # EmlParser (MimeKit), ParsedEmail, InlineImage
 │   │   ├── Pages/                # PageXhtmlBuilder, ImageResolver (AngleSharp),
-│   │   │                         #   PagePlanner, ImageShrinker (System.Drawing)
+│   │   │                         #   PagePlanner, ImageShrinker (System.Drawing),
+│   │   │                         #   AttachmentPlanner, AttachmentMarkup, PageContent
 │   │   ├── OneNote/              # OneNoteClient (Graph), NotebookTree models
 │   │   ├── Desktop/              # OneNoteInterop (COM IApplication), StaComWorker,
-│   │   │                         #   DesktopOneNoteProbe, HierarchyParser, OneNotePageXmlBuilder
+│   │   │                         #   DesktopOneNoteProbe, HierarchyParser, OneNotePageXmlBuilder,
+│   │   │                         #   AttachmentTempFolder
 │   │   ├── Backends/             # IOneNoteBackend seam, GraphBackend, DesktopOneNoteBackend,
 │   │   │                         #   BackendSelector
 │   │   ├── Auth/                 # ITokenProvider, MsalTokenProvider (WAM broker)

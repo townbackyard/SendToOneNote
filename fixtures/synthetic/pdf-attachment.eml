@@ -1,0 +1,23 @@
+From: Billing <billing@example.com>
+To: pat@example.net
+Subject: Your invoice INV-0001
+Date: Tue, 15 Sep 2026 10:00:00 +0000
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="mix1"
+
+--mix1
+Content-Type: text/html; charset="utf-8"
+Content-ID: <BODY0001@example>
+
+<html><body><p>Thanks for your order. The invoice is attached.</p></body></html>
+--mix1
+Content-Type: application/pdf; name="invoice.pdf"
+Content-Disposition: attachment; filename="invoice.pdf"
+Content-ID: <ATTACH0001@example>
+Content-Transfer-Encoding: base64
+
+JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2Jq
+CjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2Jq
+CjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAyMDAg
+MTAwXSA+PgplbmRvYmoKdHJhaWxlcgo8PCAvUm9vdCAxIDAgUiA+PgolJUVPRgo=
+--mix1--

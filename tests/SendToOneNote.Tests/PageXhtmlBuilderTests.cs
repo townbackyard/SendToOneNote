@@ -9,7 +9,9 @@ public class PageXhtmlBuilderTests
         string subject = "S & T <test>", IReadOnlyList<string>? attachments = null) =>
         new(subject, "a@b.c", "d@e.f", null,
             new DateTimeOffset(2026, 8, 20, 18, 0, 35, TimeSpan.Zero),
-            html, text, [], attachments ?? []);
+            html, text, [],
+            (attachments ?? []).Select(n => new EmailAttachment(n, "application/octet-stream", [1, 2, 3])).ToList(),
+            []);
 
     [Fact]
     public void TitleIsEscapedSubject()

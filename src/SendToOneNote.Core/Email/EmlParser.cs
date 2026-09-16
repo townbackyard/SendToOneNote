@@ -49,10 +49,39 @@ public static class EmlParser
                 Regex.Matches(html ?? "", @"cid:([^""'\s>)]+)", RegexOptions.IgnoreCase)
                     .Select(m => m.Groups[1].Value.Trim('<', '>')),
                 StringComparer.OrdinalIgnoreCase);
-            var attachments = msg.Attachments.OfType<MimePart>()
-                .Where(p => !(p.ContentId is not null && referencedCids.Contains(p.ContentId.Trim('<', '>'))))
-                .Select(p => p.FileName ?? "attachment")
-                .ToList();
+            var attachments = new List<EmailAttachment>();
+            var messageNames = new List<string>();
+            foreach (var entity in msg.Attachments)
+            {
+                switch (entity)
+                {
+                    case MimePart p:
+                        if (p.ContentId is not null && referencedCids.Contains(p.ContentId.Trim('<', '>')))
+                            continue; // inline image referenced by the body, captured above
+                        byte[] data = [];
+                        if (p.Content is not null)
+                        {
+                            using var ms = new MemoryStream();
+                            p.Content.DecodeTo(ms);
+                            data = ms.ToArray();
+                        }
+                        // MimeKit defaults ContentType to text/plain (RFC 2045 §5.2) when the part has
+                        // no Content-Type header at all, so a missing MIME type must be detected from
+                        // the raw headers, not from ContentType.MimeType (which is never null/empty).
+                        var mime = p.Headers.Contains(HeaderId.ContentType) ? p.ContentType?.MimeType : null;
+                        attachments.Add(new EmailAttachment(
+                            p.FileName ?? "attachment",
+                            string.IsNullOrWhiteSpace(mime) ? "application/octet-stream" : mime,
+                            data));
+                        break;
+                    case MessagePart mp:
+                        // Nested .eml: listed by name, never embedded (no useful handler for new-Outlook users).
+                        var subject = mp.Message?.Subject;
+                        messageNames.Add(!string.IsNullOrWhiteSpace(subject) ? subject
+                            : mp.ContentDisposition?.FileName ?? "attached message");
+                        break;
+                }
+            }
 
             DateTimeOffset? sent = msg.Date == DateTimeOffset.MinValue ? null : msg.Date;
 
@@ -65,7 +94,8 @@ public static class EmlParser
                 HtmlBody: html,
                 TextBody: text,
                 InlineImages: inline,
-                AttachmentNames: attachments);
+                Attachments: attachments,
+                AttachedMessageNames: messageNames);
         }
         catch (EmlParseException)
         {

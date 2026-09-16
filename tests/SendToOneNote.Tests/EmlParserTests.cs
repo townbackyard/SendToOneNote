@@ -179,4 +179,63 @@ public class EmlParserTests
         Assert.Equal("logo1@example", Assert.Single(e.InlineImages).ContentId);
         Assert.Empty(e.AttachmentNames);
     }
+
+    [Fact]
+    public void CapturesAttachmentBytesAndContentType()
+    {
+        var e = EmlParser.Parse(Fixtures.Open("pdf-attachment.eml"));
+        var a = Assert.Single(e.Attachments);
+        Assert.Equal("invoice.pdf", a.FileName);
+        Assert.Equal("application/pdf", a.ContentType);
+        Assert.True(a.Data.Length > 100);
+        Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(a.Data, 0, 4)); // decoded, not base64 text
+        Assert.Empty(e.AttachedMessageNames);
+        Assert.Equal(["invoice.pdf"], e.AttachmentNames);
+        Assert.Empty(e.InlineImages);
+    }
+
+    [Fact]
+    public void AttachedMessageIsListedByNameNotEmbedded()
+    {
+        var e = EmlParser.Parse(Fixtures.Open("attached-message.eml"));
+        Assert.Empty(e.Attachments);
+        Assert.Equal(["Original note about the picnic"], e.AttachedMessageNames);
+        Assert.Equal(["Original note about the picnic"], e.AttachmentNames);
+    }
+
+    [Fact]
+    public void InlineCidImageIsNotAnAttachment()
+    {
+        var e = EmlParser.Parse(Fixtures.Open("inline-cid-image.eml"));
+        Assert.Empty(e.Attachments);
+        Assert.Empty(e.AttachedMessageNames);
+    }
+
+    [Fact]
+    public void AttachmentWithoutContentTypeFallsBackToOctetStream()
+    {
+        var raw = """
+            From: sender@example.com
+            To: recipient@example.com
+            Subject: Blob
+            MIME-Version: 1.0
+            Content-Type: multipart/mixed; boundary="mixed9"
+
+            --mixed9
+            Content-Type: text/plain
+
+            body
+            --mixed9
+            Content-Disposition: attachment; filename="data.bin"
+            Content-Transfer-Encoding: base64
+
+            AQID
+            --mixed9--
+            """;
+        var e = EmlParser.Parse(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(raw)));
+        var a = Assert.Single(e.Attachments);
+        Assert.Equal("data.bin", a.FileName);
+        Assert.Equal("application/octet-stream", a.ContentType);
+        Assert.Equal(new byte[] { 1, 2, 3 }, a.Data);
+    }
 }

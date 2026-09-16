@@ -24,6 +24,8 @@ public class FixtureTests
     [InlineData("plain-text-receipt.eml")]
     [InlineData("inline-cid-image.eml")]
     [InlineData("malformed.eml")]
+    [InlineData("pdf-attachment.eml")]
+    [InlineData("attached-message.eml")]
     public void FixtureExists(string name) =>
         Assert.True(File.Exists(Path.Combine(Fixtures.Dir, name)));
 }

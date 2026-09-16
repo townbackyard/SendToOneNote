@@ -22,4 +22,20 @@ public class LocalFixtureTests
         Assert.False(string.IsNullOrWhiteSpace(e.Subject));
         Assert.True(e.HtmlBody is not null || e.TextBody is not null);
     }
+
+    [SkippableTheory]
+    [MemberData(nameof(LocalEmls))]
+    public void RealAttachmentsCarryBytes(string? path)
+    {
+        Skip.If(path is null, "fixtures/local not present (CI or fresh clone)");
+        using var s = File.OpenRead(path!);
+        var e = EmlParser.Parse(s);
+        Assert.All(e.Attachments, a =>
+        {
+            Assert.False(string.IsNullOrWhiteSpace(a.FileName));
+            Assert.False(string.IsNullOrWhiteSpace(a.ContentType));
+            Assert.True(a.Data.Length > 0);
+        });
+        Assert.Equal(e.Attachments.Count + e.AttachedMessageNames.Count, e.AttachmentNames.Count);
+    }
 }

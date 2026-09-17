@@ -13,4 +13,17 @@
     <UseWPF>true</UseWPF>
   </PropertyGroup>
 
+  <!-- One icon per configuration (regenerate with tools/make-icons.ps1): the same file is the exe's
+       application icon and the embedded resource AppIcon loads for the tray, so a debug build is
+       visibly different everywhere it shows up. -->
+  <PropertyGroup>
+    <AppIconFile Condition="'$(Configuration)' == 'Debug'">Assets\app-debug.ico</AppIconFile>
+    <AppIconFile Condition="'$(Configuration)' != 'Debug'">Assets\app-release.ico</AppIconFile>
+    <ApplicationIcon>$(AppIconFile)</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="$(AppIconFile)" LogicalName="SendToOneNote.app.ico" />
+  </ItemGroup>
+
 </Project>

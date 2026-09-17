@@ -26,8 +26,12 @@ SendToOneNote/
 │       ├── PickerWindow.xaml     # Classic-style section picker
 │       ├── FirstRunWindow.xaml   # Sign-in + folder choice + startup shortcut
 │       ├── SavePipeline.cs       # Orchestration: eml path → OneNote page
-│       └── TrayContext.cs        # Tray icon, watcher wiring, notifications
+│       ├── TrayContext.cs        # Tray icon, watcher wiring, notifications
+│       ├── AppIcon.cs            # Loads the embedded icon at tray size; " (debug)" tooltip suffix
+│       └── Assets/               # app-release.ico (purple) · app-debug.ico (orange, "D" badge) —
+│                                 #   the csproj picks one per configuration as exe icon + tray resource
 ├── tests/SendToOneNote.Tests/    # xUnit against Core
+├── tools/make-icons.ps1          # Regenerates both .ico files (System.Drawing; -PreviewDir for a contact sheet)
 ├── fixtures/
 │   ├── synthetic/                # Committed test .emls (fabricated content)
 │   └── local/                    # GITIGNORED — owner's real emails

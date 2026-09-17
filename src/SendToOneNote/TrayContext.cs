@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
-using System.Windows.Media;
 using H.NotifyIcon;
 using H.NotifyIcon.Core;
 using SendToOneNote.Core.Auth;
@@ -20,6 +19,8 @@ public sealed class TrayContext : IDisposable
     private readonly FileLog _log;
     private readonly StaComWorker _comWorker = new();
     private TaskbarIcon? _icon;
+    // Owned here: the HICON must outlive the TaskbarIcon that displays it.
+    private System.Drawing.Icon? _trayIcon;
     private DropFolderWatcher? _watcher;
     // Null in desktop-OneNote mode — nothing to sign in to, so no "Sign in again" menu item.
     private MsalTokenProvider? _tokens;
@@ -76,19 +77,13 @@ public sealed class TrayContext : IDisposable
         _watcher.WatchError += msg => { _log.Error(msg); Notify("SendToOneNote — problem", msg, null); };
         _watcher.Start();
 
+        _trayIcon = AppIcon.LoadForTray();
         _icon = new TaskbarIcon
         {
-            ToolTipText = choice.Kind == BackendKind.Desktop
+            ToolTipText = (choice.Kind == BackendKind.Desktop
                 ? "SendToOneNote — desktop OneNote"
-                : "SendToOneNote — cloud (Graph)",
-            IconSource = new GeneratedIconSource
-            {
-                Text = "N",
-                Background = Brushes.SteelBlue,
-                Foreground = Brushes.White,
-                FontSize = 96,
-                FontWeight = FontWeights.Bold
-            }
+                : "SendToOneNote — cloud (Graph)") + AppIcon.TooltipSuffix,
+            Icon = _trayIcon
         };
         // Subscribe once — the handler always opens whatever page the most recent
         // notification pointed at (null means the last toast carried no page URL).
@@ -146,6 +141,7 @@ public sealed class TrayContext : IDisposable
     public void Dispose()
     {
         _icon?.Dispose();
+        _trayIcon?.Dispose();
         _watcher?.Dispose();
         _comWorker.Dispose();
         _tokens = null;

@@ -87,3 +87,7 @@ Remote images are downloaded and embedded so pages outlive expiring links.
 ## Building from source
 
 dotnet build / dotnet test / dotnet run --project src/SendToOneNote. MIT license.
+
+Debug builds show an orange icon with a "D" badge (and "(debug)" in the tray
+tooltip); release builds show the purple one. Only one copy runs at a time, so
+exit the installed app from the tray before running a debug build.

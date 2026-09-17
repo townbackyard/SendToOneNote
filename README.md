@@ -35,7 +35,6 @@ request budget is also skipped with a note.
 
 1. Download the latest release zip, unzip, run SendToOneNote.exe.
    (SmartScreen may warn because the exe is unsigned: More info → Run anyway.)
-   Until the first release is published, build from source (see below).
 2. If you have desktop OneNote, there is no sign-in — just pick the folder.
    Otherwise, sign in with the Microsoft account whose OneDrive holds your
    notebooks (work/school or personal).

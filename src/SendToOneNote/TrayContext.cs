@@ -93,9 +93,13 @@ public sealed class TrayContext : IDisposable
                 Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
         };
 
+        void OpenDropFolder() =>
+            Process.Start(new ProcessStartInfo("explorer.exe", $"\"{settings.DropFolder}\"") { UseShellExecute = true });
+        // Single left-click is the default action; the context menu stays on right-click.
+        _icon.TrayLeftMouseUp += (_, _) => OpenDropFolder();
+
         var menu = new System.Windows.Controls.ContextMenu();
-        AddItem(menu, "Open drop folder", () =>
-            Process.Start(new ProcessStartInfo("explorer.exe", $"\"{settings.DropFolder}\"") { UseShellExecute = true }));
+        AddItem(menu, "Open drop folder", OpenDropFolder);
         if (_tokens is { } signIn)
         {
             AddItem(menu, "Sign in again", async () =>

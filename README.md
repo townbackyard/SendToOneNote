@@ -38,7 +38,8 @@ request budget is also skipped with a note.
 2. If you have desktop OneNote, there is no sign-in — just pick the folder.
    Otherwise, sign in with the Microsoft account whose OneDrive holds your
    notebooks (work/school or personal).
-3. Choose your drop folder. Done — drag emails in.
+3. Choose your drop folder. Done — drag emails in. Left-click the tray icon
+   any time to open the drop folder; right-click for the menu.
 
 ## Company (work/school) accounts
 

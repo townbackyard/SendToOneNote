@@ -7,6 +7,11 @@ public static class EmlParser
 {
     public static ParsedEmail Parse(Stream emlStream)
     {
+        // Checked before MimeKit sees the file: MimeKit is lenient enough to hand multi-line
+        // markup back as a text body, which would save a page of raw HTML source.
+        if (StartsWithHtmlDocument(emlStream))
+            throw new EmlParseException("File is a web page, not an email.") { IsWebPage = true };
+
         MimeMessage msg;
         try
         {
@@ -105,6 +110,22 @@ public static class EmlParser
         {
             throw new EmlParseException("Failed to extract email content.", ex);
         }
+    }
+
+    // A MIME message starts with a header line, never with markup, so a leading "<!doctype html"
+    // or "<html" (after an optional BOM and whitespace) means the file is a web page. Peeks only:
+    // the stream is rewound so the caller's parse still starts at the beginning.
+    private static bool StartsWithHtmlDocument(Stream stream)
+    {
+        if (!stream.CanSeek) return false;
+        var start = stream.Position;
+        var buffer = new byte[256];
+        var read = stream.ReadAtLeast(buffer, buffer.Length, throwOnEndOfStream: false);
+        stream.Position = start;
+
+        var head = System.Text.Encoding.UTF8.GetString(buffer, 0, read).TrimStart('﻿', ' ', '\t', '\r', '\n');
+        return head.StartsWith("<!doctype html", StringComparison.OrdinalIgnoreCase)
+            || head.StartsWith("<html", StringComparison.OrdinalIgnoreCase);
     }
 
     // A C0/C1 control character in a file name survives HtmlEncode and AngleSharp into the page

@@ -58,6 +58,43 @@ public class EmlParserTests
     }
 
     [Fact]
+    public void GarbageIsNotFlaggedAsWebPage()
+    {
+        var e = Assert.Throws<EmlParseException>(() => EmlParser.Parse(Fixtures.Open("malformed.eml")));
+        Assert.False(e.IsWebPage);
+    }
+
+    // New Outlook's drag-out can write its own web-app page under the .eml name (seen 2026-11).
+    // The file holds nothing of the message, so the user needs a different hint than "not readable".
+    [Fact]
+    public void WebPageSavedAsEmlIsFlaggedAsWebPage()
+    {
+        var e = Assert.Throws<EmlParseException>(() => EmlParser.Parse(Fixtures.Open("web-page-not-email.eml")));
+        Assert.True(e.IsWebPage);
+    }
+
+    // MimeKit is lenient with multi-line junk and would hand the markup back as a text body,
+    // which would save a page of raw HTML source — so a web page must be rejected up front.
+    [Theory]
+    [InlineData("<!DOCTYPE html>\r\n<html>\r\n<head><title>x</title></head>\r\n<body>hello</body>\r\n</html>\r\n")]
+    [InlineData("<html>\n<body>hello</body>\n</html>\n")]
+    [InlineData("﻿\r\n  <!doctype html><html><body>hello</body></html>")]
+    public void WebPageVariantsAreFlaggedAsWebPage(string content)
+    {
+        var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(content));
+        var e = Assert.Throws<EmlParseException>(() => EmlParser.Parse(stream));
+        Assert.True(e.IsWebPage);
+    }
+
+    [Fact]
+    public void EmailWhoseBodyIsHtmlIsNotAWebPage()
+    {
+        var raw = "From: a@b.c\r\nTo: d@e.f\r\nContent-Type: text/html\r\n\r\n<!doctype html><html><body>hi</body></html>";
+        var e = EmlParser.Parse(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(raw)));
+        Assert.Contains("hi", e.HtmlBody);
+    }
+
+    [Fact]
     public void ExtractsAttachmentNames()
     {
         var raw = """

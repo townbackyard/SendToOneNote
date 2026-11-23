@@ -23,4 +23,12 @@ public sealed record ParsedEmail(
 }
 
 public sealed class EmlParseException(string message, Exception? inner = null)
-    : Exception(message, inner);
+    : Exception(message, inner)
+{
+    /// <summary>
+    /// The file is an HTML document, not a MIME message. New Outlook's drag-out sometimes writes
+    /// its own web-app page under the .eml name; the file then holds nothing of the email, so
+    /// retrying the same file can never work.
+    /// </summary>
+    public bool IsWebPage { get; init; }
+}

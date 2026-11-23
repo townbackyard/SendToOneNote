@@ -71,6 +71,12 @@ Remote images are downloaded and embedded so pages outlive expiring links.
 
 - Drag-out from new Outlook sometimes needs the message clicked first
   (known Outlook regression); "… → Save as" always works.
+- "Outlook saved a web page instead of the email": since November 2026 new
+  Outlook's drag-out writes its own web-app page into the .eml for some
+  messages (the same messages fail every time; restarting Outlook doesn't
+  help). The file holds nothing of the email, so SendToOneNote can't recover
+  it — use "… → Save as" for those messages, or drag from another mail app
+  such as Thunderbird.
 - Failed saves land in the drop folder's Failed subfolder, each with a
   matching .error.txt explaining what went wrong; full logs in
   %APPDATA%\SendToOneNote\logs.

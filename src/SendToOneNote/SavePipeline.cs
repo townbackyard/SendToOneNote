@@ -112,6 +112,8 @@ public sealed class SavePipeline(
             log.Error($"Failed for {path}", ex);
             var reason = ex switch
             {
+                EmlParseException { IsWebPage: true } =>
+                    "Outlook saved a web page instead of the email. Use \"… → Save as\" in Outlook to save it into the drop folder.",
                 EmlParseException => "That file isn't a readable email.",
                 AuthRequiredException => "Sign-in required — open SendToOneNote from the tray.",
                 OneNoteApiException o => $"OneNote API error {o.StatusCode}.",
@@ -147,6 +149,11 @@ public sealed class SavePipeline(
             Directory.CreateDirectory(failed);
             var dest = Path.Combine(failed, Path.GetFileName(path));
             File.Move(path, dest, overwrite: true);
+            // A web page saved under the .eml name holds nothing of the email, so dragging
+            // that same file back can never work — the email has to be saved again.
+            var retry = ex is EmlParseException { IsWebPage: true }
+                ? "To retry: save the email again from Outlook with \"… → Save as\" into the drop folder. Dragging this file back will not work — it does not contain the email."
+                : "To retry: drag the .eml file back into the drop folder.";
             // Sidecar so the user can see WHY without hunting for the app log.
             File.WriteAllText(dest + ".error.txt",
                 $"""
@@ -154,7 +161,7 @@ public sealed class SavePipeline(
 
                 {reason}
 
-                To retry: drag the .eml file back into the drop folder.
+                {retry}
 
                 Technical detail:
                 {ex}
